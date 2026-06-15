@@ -16,6 +16,9 @@ RUN docker-php-ext-install pdo pdo_pgsql
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Suppress "don't run composer as root" warning (Railway runs as root)
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
 # Copy application source
 COPY . /app
 
@@ -48,10 +51,5 @@ RUN mkdir -p /app/storage/app/private/reports \
 
 EXPOSE 80
 
-# Run migrations, cache config/routes/views, then start Apache
-CMD ["sh", "-c", \
-  "cd /app && php artisan migrate --force \
-   && php artisan config:cache \
-   && php artisan route:cache \
-   && php artisan view:cache \
-   && apache2-foreground"]
+# start.sh: waits for DB, runs migrations, caches config/routes/views, starts Apache
+CMD ["sh", "/app/start.sh"]
