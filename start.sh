@@ -3,14 +3,15 @@ set -e
 
 cd /app
 
+echo "[start] PHP version: $(php -r 'echo PHP_VERSION;')"
+echo "[start] Laravel version: $(php artisan --version 2>&1 | head -1)"
+
 # ── Parse DB connection details from DATABASE_URL or individual vars ──────────
 # DATABASE_URL format: postgresql://user:pass@host:port/dbname
 if [ -n "$DATABASE_URL" ]; then
     PG_HOST=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/]+).*|\1|')
     PG_PORT=$(echo "$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|')
     PG_PORT="${PG_PORT:-5432}"
-
-    # Extract individual creds for the PDO probe below
     PG_USER=$(echo "$DATABASE_URL" | sed -E 's|.*://([^:]+):.*|\1|')
     PG_PASS=$(echo "$DATABASE_URL" | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|')
     PG_DB=$(echo   "$DATABASE_URL" | sed -E 's|.*/([^?]+).*|\1|')
@@ -22,11 +23,20 @@ else
     PG_DB="${DB_DATABASE:-railway}"
 fi
 
+echo "[start] Connecting to PostgreSQL at ${PG_HOST}:${PG_PORT} db=${PG_DB} user=${PG_USER}"
+
 # ── Wait for PostgreSQL ───────────────────────────────────────────────────────
-echo "[start] Waiting for PostgreSQL at ${PG_HOST}:${PG_PORT}..."
 CONNECTED=0
 for i in $(seq 1 30); do
-    if php -r "new PDO('pgsql:host=${PG_HOST};port=${PG_PORT};dbname=${PG_DB}', '${PG_USER}', '${PG_PASS}');" 2>/dev/null; then
+    if php -r "
+        try {
+            \$pdo = new PDO('pgsql:host=${PG_HOST};port=${PG_PORT};dbname=${PG_DB}', '${PG_USER}', '${PG_PASS}');
+            echo 'OK';
+        } catch (Exception \$e) {
+            fwrite(STDERR, \$e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+    " 2>&1 | grep -q OK; then
         echo "[start] Database is ready."
         CONNECTED=1
         break
@@ -36,7 +46,14 @@ for i in $(seq 1 30); do
 done
 
 if [ "$CONNECTED" -eq 0 ]; then
-    echo "[start] ERROR: Could not connect to PostgreSQL after 30 retries. Aborting."
+    echo "[start] ERROR: Could not connect to PostgreSQL after 30 retries."
+    echo "[start] Host=${PG_HOST} Port=${PG_PORT} DB=${PG_DB} User=${PG_USER}"
+    exit 1
+fi
+
+# ── Key check ─────────────────────────────────────────────────────────────────
+if [ -z "$APP_KEY" ]; then
+    echo "[start] ERROR: APP_KEY is not set. Set it in Railway Variables."
     exit 1
 fi
 
@@ -44,15 +61,19 @@ fi
 echo "[start] Running migrations..."
 php artisan migrate --force
 
-# ── Artisan caches (uses live env vars, not baked-in .env) ───────────────────
-echo "[start] Caching config, routes, views..."
+# ── Artisan caches ────────────────────────────────────────────────────────────
+echo "[start] Caching config..."
 php artisan config:cache
+
+echo "[start] Caching routes..."
 php artisan route:cache
+
+echo "[start] Caching views..."
 php artisan view:cache
 
-# ── Link storage (idempotent) ─────────────────────────────────────────────────
+# ── Storage link ──────────────────────────────────────────────────────────────
 echo "[start] Linking storage..."
 php artisan storage:link --force 2>/dev/null || true
 
-echo "[start] Starting Apache..."
+echo "[start] Boot complete. Starting Apache..."
 exec apache2-foreground

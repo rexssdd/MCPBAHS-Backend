@@ -19,18 +19,25 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Suppress "don't run composer as root" warning (Railway runs as root)
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# Copy application source (excludes files listed in .dockerignore)
-COPY . /app
+# Copy composer files first for better layer caching
+COPY composer.json composer.lock /app/
 
 # Install PHP dependencies (no dev, optimised autoloader)
 RUN composer install --optimize-autoloader --no-dev --no-interaction
 
-# Clear any stale bootstrap cache baked in from local dev
-# (config:cache etc. run at container startup instead, using live env vars)
+# Copy application source (excludes files listed in .dockerignore)
+COPY . /app
+
+# Re-run composer to ensure autoload is correct after full copy
+RUN composer dump-autoload --optimize --no-dev
+
+# Nuke ALL bootstrap caches — they were built with local env vars and
+# must be regenerated at container startup against live Railway env vars
 RUN rm -f /app/bootstrap/cache/config.php \
            /app/bootstrap/cache/routes-v7.php \
            /app/bootstrap/cache/services.php \
-           /app/bootstrap/cache/events.php
+           /app/bootstrap/cache/events.php \
+           /app/bootstrap/cache/packages.php
 
 # Enable Apache modules
 RUN a2enmod rewrite headers
@@ -46,7 +53,6 @@ RUN echo '<VirtualHost *:80>\n\
 </VirtualHost>' > /etc/apache2/sites-available/000-default.conf
 
 # Create storage directories and set permissions
-# Railway runs as root so we own everything; www-data is the Apache user
 RUN mkdir -p /app/storage/app/private/reports \
              /app/storage/app/public \
              /app/storage/framework/cache/data \

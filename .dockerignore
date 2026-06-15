@@ -29,11 +29,15 @@ Thumbs.db
 README.md
 CHANGELOG.md
 
-# Stale bootstrap caches (cleared explicitly in Dockerfile anyway)
-bootstrap/cache/*.php
+# Bootstrap caches — generated at container startup with live env vars
+bootstrap/cache/config.php
+bootstrap/cache/routes-v7.php
+bootstrap/cache/services.php
+bootstrap/cache/events.php
+bootstrap/cache/packages.php
 
-# Storage contents — generated at runtime, not baked into image
+# Storage runtime files — generated at runtime
 storage/logs/*.log
-storage/framework/cache/*
-storage/framework/sessions/*
-storage/framework/views/*
+storage/framework/cache/data
+storage/framework/sessions
+storage/framework/views
