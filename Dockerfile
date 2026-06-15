@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions (pgsql only — MySQL not needed in production)
+# Install PHP extensions
 RUN docker-php-ext-install pdo pdo_pgsql
 
 # Install Composer
@@ -22,13 +22,20 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 # Copy application source
 COPY . /app
 
-# Install PHP dependencies (no dev, optimised autoloader)
+# Install PHP dependencies
 RUN composer install --optimize-autoloader --no-dev --no-interaction
+
+# Clear any stale bootstrap cache baked in from local dev
+# (config:cache etc. run at container startup instead, using live env vars)
+RUN rm -f /app/bootstrap/cache/config.php \
+           /app/bootstrap/cache/routes-v7.php \
+           /app/bootstrap/cache/services.php \
+           /app/bootstrap/cache/events.php
 
 # Enable Apache modules
 RUN a2enmod rewrite headers
 
-# Configure Apache virtual host pointing to Laravel's public/ directory
+# Configure Apache virtual host
 RUN echo '<VirtualHost *:80>\n\
     DocumentRoot /app/public\n\
     <Directory /app/public>\n\
@@ -51,5 +58,4 @@ RUN mkdir -p /app/storage/app/private/reports \
 
 EXPOSE 80
 
-# start.sh: waits for DB, runs migrations, caches config/routes/views, starts Apache
 CMD ["sh", "/app/start.sh"]
