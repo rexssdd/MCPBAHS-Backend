@@ -8,6 +8,8 @@ class DeleteReportAction
 {
     public function execute(string $filePath): void
     {
-        Storage::disk('local')->delete($filePath);
+        // Uses the disk configured via FILESYSTEM_DISK env var (same disk
+        // that StoreReportAction used when the file was saved).
+        Storage::delete($filePath);
     }
 }

@@ -7,49 +7,51 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     git \
     curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js for the Vite frontend build
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get update && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo pdo_pgsql pdo_mysql
+# Install PHP extensions (pgsql only — MySQL not needed in production)
+RUN docker-php-ext-install pdo pdo_pgsql
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy entire application
+# Copy application source
 COPY . /app
 
-# Install backend dependencies
-WORKDIR /app/backend
+# Install PHP dependencies (no dev, optimised autoloader)
 RUN composer install --optimize-autoloader --no-dev --no-interaction
 
-# Build frontend
-WORKDIR /app/frontend
-RUN npm ci && VITE_BASE_PATH=/app/ npm run build && cp -r dist ../backend/public/app
+# Enable Apache modules
+RUN a2enmod rewrite headers
 
-# Configure Apache
-WORKDIR /app/backend
-RUN a2enmod rewrite
-RUN a2enmod headers
-
-# Set permissions
-RUN chown -R www-data:www-data /app
-
-# Copy Apache configuration
+# Configure Apache virtual host pointing to Laravel's public/ directory
 RUN echo '<VirtualHost *:80>\n\
-    DocumentRoot /app/backend/public\n\
-    <Directory /app/backend/public>\n\
+    DocumentRoot /app/public\n\
+    <Directory /app/public>\n\
         Options Indexes FollowSymLinks\n\
         AllowOverride All\n\
         Require all granted\n\
     </Directory>\n\
 </VirtualHost>' > /etc/apache2/sites-available/000-default.conf
 
+# Create storage directories and set permissions
+RUN mkdir -p /app/storage/app/private/reports \
+             /app/storage/app/public \
+             /app/storage/framework/cache \
+             /app/storage/framework/sessions \
+             /app/storage/framework/views \
+             /app/storage/logs \
+             /app/bootstrap/cache \
+    && chown -R www-data:www-data /app/storage /app/bootstrap/cache \
+    && chmod -R 775 /app/storage /app/bootstrap/cache
+
 EXPOSE 80
 
-# Run migrations, cache config/routes/views, then start Apache (production server)
-CMD ["sh", "-c", "cd /app/backend && php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache && apache2-foreground"]
+# Run migrations, cache config/routes/views, then start Apache
+CMD ["sh", "-c", \
+  "cd /app && php artisan migrate --force \
+   && php artisan config:cache \
+   && php artisan route:cache \
+   && php artisan view:cache \
+   && apache2-foreground"]

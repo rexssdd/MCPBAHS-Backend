@@ -14,7 +14,7 @@ use App\Services\ReportService;
 use DomainException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
@@ -131,31 +131,26 @@ class ReportController extends Controller
         }
     }
 
-    public function download(Report $report): BinaryFileResponse
+    /**
+     * Stream a report file download from whichever disk is configured
+     * (local in dev, S3/R2 in production).
+     *
+     * Uses Storage::download() which works for both local and cloud disks —
+     * no hard-coded paths, no BinaryFileResponse (which only works with
+     * local filesystem paths and would break on S3).
+     */
+    public function download(Report $report): StreamedResponse
     {
         /** @var User $user */
         $user = Auth::user();
 
         abort_unless($user->can('download', $report), 403);
-
         abort_unless($report->file_path, 404, 'File path missing.');
+        abort_unless(Storage::exists($report->file_path), 404, 'File not found.');
 
-        // FIX: Use Storage::disk('local') instead of a hardcoded storage_path('app/...')
-        // prefix. In Laravel 11 the 'local' disk root is storage/app/private (not
-        // storage/app), so the old prefix resolved to a path that never exists on disk,
-        // causing every download to return 404. Using the Storage facade always resolves
-        // relative to the configured disk root regardless of Laravel version.
-        abort_unless(
-            Storage::disk('local')->exists($report->file_path),
-            404,
-            'File not found on server.'
-        );
-
-        $fullPath = Storage::disk('local')->path($report->file_path);
-
-        return response()->download(
-            $fullPath,
-            $report->original_filename ?? basename($fullPath)
+        return Storage::download(
+            $report->file_path,
+            $report->original_filename ?? basename($report->file_path)
         );
     }
 }

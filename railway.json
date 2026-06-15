@@ -7,8 +7,5 @@
     "healthcheckPath": "/up",
     "restartPolicyMaxRetries": 5,
     "restartPolicyWindowMs": 60000
-  },
-  "plugins": [
-    "postgresql"
-  ]
+  }
 }
