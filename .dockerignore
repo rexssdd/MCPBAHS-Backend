@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Local environment — NEVER bake secrets into the image
+.env
+.env.local
+.env.*.local
+
+# Dev tooling
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Tests & CI
+tests
+phpunit.xml
+.phpunit.result.cache
+
+# Editor / OS
+.editorconfig
+.idea
+.vscode
+*.DS_Store
+Thumbs.db
+
+# Docs
+README.md
+CHANGELOG.md
+
+# Stale bootstrap caches (cleared explicitly in Dockerfile anyway)
+bootstrap/cache/*.php
+
+# Storage contents — generated at runtime, not baked into image
+storage/logs/*.log
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*

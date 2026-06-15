@@ -19,10 +19,10 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Suppress "don't run composer as root" warning (Railway runs as root)
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# Copy application source
+# Copy application source (excludes files listed in .dockerignore)
 COPY . /app
 
-# Install PHP dependencies
+# Install PHP dependencies (no dev, optimised autoloader)
 RUN composer install --optimize-autoloader --no-dev --no-interaction
 
 # Clear any stale bootstrap cache baked in from local dev
@@ -46,9 +46,10 @@ RUN echo '<VirtualHost *:80>\n\
 </VirtualHost>' > /etc/apache2/sites-available/000-default.conf
 
 # Create storage directories and set permissions
+# Railway runs as root so we own everything; www-data is the Apache user
 RUN mkdir -p /app/storage/app/private/reports \
              /app/storage/app/public \
-             /app/storage/framework/cache \
+             /app/storage/framework/cache/data \
              /app/storage/framework/sessions \
              /app/storage/framework/views \
              /app/storage/logs \
