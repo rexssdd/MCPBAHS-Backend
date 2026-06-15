@@ -4,6 +4,7 @@
     "builder": "dockerfile"
   },
   "deploy": {
+    "startCommand": "sh /app/start.sh",
     "healthcheckPath": "/up",
     "healthcheckTimeout": 120,
     "restartPolicyType": "on_failure",

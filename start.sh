@@ -71,9 +71,18 @@ php artisan route:cache
 echo "[start] Caching views..."
 php artisan view:cache
 
+echo "[start] Optimising class map..."
+php artisan optimize
+
 # ── Storage link ──────────────────────────────────────────────────────────────
 echo "[start] Linking storage..."
-php artisan storage:link --force 2>/dev/null || true
+# Remove a stale real directory if it somehow survived the Docker build step,
+# then create the symlink. The Dockerfile already does `rm -rf public/storage`
+# but this guard makes the script safe if run outside Docker too.
+if [ -d /app/public/storage ] && [ ! -L /app/public/storage ]; then
+    rm -rf /app/public/storage
+fi
+php artisan storage:link --force
 
 echo "[start] Boot complete. Starting Apache..."
 exec apache2-foreground

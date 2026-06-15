@@ -12,6 +12,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Railway (and most PaaS) sits behind a load balancer / reverse proxy.
+        // Without trusting the proxy, $request->secure() returns false even on
+        // HTTPS, which breaks Sanctum's secure cookie flag and HTTPS redirects.
+        // '*' trusts all proxies — safe on Railway because only Railway's own
+        // infrastructure can reach the container directly.
+        $middleware->trustProxies(at: '*');
+
         // PROD-FIX-5: Apply throttle to all API routes (60 req/min per user/IP).
         // Without this, there was no rate limit on any authenticated API endpoint —
         // any script could hammer /reports, /announcements, etc. without restriction.

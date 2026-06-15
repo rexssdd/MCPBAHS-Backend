@@ -11,7 +11,21 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo pdo_pgsql
+# pcntl: lets queue:work catch SIGTERM so Railway can gracefully shut down workers
+# opcache: bytecode cache — significant throughput improvement in production
+RUN docker-php-ext-install pdo pdo_pgsql pcntl \
+    && docker-php-ext-enable opcache
+
+# Tune OPcache for a read-only, containerised filesystem
+RUN { \
+        echo 'opcache.enable=1'; \
+        echo 'opcache.memory_consumption=128'; \
+        echo 'opcache.interned_strings_buffer=8'; \
+        echo 'opcache.max_accelerated_files=10000'; \
+        echo 'opcache.revalidate_freq=0'; \
+        echo 'opcache.validate_timestamps=0'; \
+        echo 'opcache.fast_shutdown=1'; \
+    } > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -32,6 +46,11 @@ RUN rm -f /app/bootstrap/cache/config.php \
            /app/bootstrap/cache/services.php \
            /app/bootstrap/cache/events.php \
            /app/bootstrap/cache/packages.php
+
+# Remove public/storage if it exists as a real directory so that
+# `php artisan storage:link` can create the symlink at runtime.
+# (storage:link refuses to overwrite an existing non-symlink path.)
+RUN rm -rf /app/public/storage
 
 # Enable Apache modules
 RUN a2enmod rewrite headers
