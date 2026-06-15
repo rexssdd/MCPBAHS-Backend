@@ -19,17 +19,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Suppress "don't run composer as root" warning (Railway runs as root)
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# Copy composer files first for better layer caching
-COPY composer.json composer.lock /app/
-
-# Install PHP dependencies (no dev, optimised autoloader)
-RUN composer install --optimize-autoloader --no-dev --no-interaction
-
 # Copy application source (excludes files listed in .dockerignore)
 COPY . /app
 
-# Re-run composer to ensure autoload is correct after full copy
-RUN composer dump-autoload --optimize --no-dev
+# Install PHP dependencies (no dev, optimised autoloader)
+RUN composer install --optimize-autoloader --no-dev --no-interaction
 
 # Nuke ALL bootstrap caches — they were built with local env vars and
 # must be regenerated at container startup against live Railway env vars
