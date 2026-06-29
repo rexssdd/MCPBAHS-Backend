@@ -6,7 +6,10 @@ cd /app
 echo "[start] PHP version: $(php -r 'echo PHP_VERSION;')"
 echo "[start] Laravel version: $(php artisan --version)"
 
-# Ensure required directories exist
+# -------------------------------
+# Laravel directories
+# -------------------------------
+
 mkdir -p \
     bootstrap/cache \
     storage/app/public \
@@ -16,10 +19,11 @@ mkdir -p \
     storage/framework/views \
     storage/logs
 
+chown -R www-data:www-data storage bootstrap/cache || true
 chmod -R 775 storage bootstrap/cache || true
 
 # -------------------------------
-# Database connection
+# Database
 # -------------------------------
 
 if [ -n "${DATABASE_URL:-}" ]; then
@@ -42,32 +46,26 @@ fi
 
 echo "[start] Connecting to PostgreSQL at ${PG_HOST}:${PG_PORT}"
 
-# -------------------------------
-# Wait for PostgreSQL
-# -------------------------------
-
 for i in $(seq 1 30); do
     php -r "
-        try {
-            new PDO(
-                'pgsql:host=${PG_HOST};port=${PG_PORT};dbname=${PG_DB};sslmode=require',
-                '${PG_USER}',
-                '${PG_PASS}'
-            );
-            exit(0);
-        } catch (Throwable \$e) {
-            fwrite(STDERR,\$e->getMessage().PHP_EOL);
-            exit(1);
-        }
-    " && break
+    try {
+        new PDO(
+            'pgsql:host=${PG_HOST};port=${PG_PORT};dbname=${PG_DB};sslmode=require',
+            '${PG_USER}',
+            '${PG_PASS}'
+        );
+    } catch (Throwable \$e) {
+        fwrite(STDERR,\$e->getMessage());
+        exit(1);
+    }
+    "
+
+    if [ $? -eq 0 ]; then
+        break
+    fi
 
     echo "[start] Waiting for PostgreSQL... ($i/30)"
     sleep 2
-
-    if [ "$i" = "30" ]; then
-        echo "[start] ERROR: Database connection failed."
-        exit 1
-    fi
 done
 
 echo "[start] Database connected."
@@ -76,43 +74,35 @@ echo "[start] Database connected."
 # APP_KEY
 # -------------------------------
 
-if [ -z "${APP_KEY:-}" ]; then
-    echo "[start] APP_KEY is missing."
+[ -n "${APP_KEY:-}" ] || {
+    echo "[start] APP_KEY missing"
     exit 1
-fi
+}
 
 # -------------------------------
 # Laravel
 # -------------------------------
 
 echo "[start] Clearing caches..."
-
 php artisan optimize:clear || true
 
 echo "[start] Running migrations..."
-
 php artisan migrate --force
 
 echo "[start] Creating storage link..."
-
 rm -rf public/storage
-
 php artisan storage:link || true
 
 echo "[start] Caching configuration..."
-
 php artisan config:cache
 
-echo "[start] Caching views..."
-
-php artisan view:cache
-
 echo "[start] Caching routes..."
-
 php artisan route:cache || true
 
-echo "[start] Optimizing..."
+echo "[start] Caching views..."
+php artisan view:cache
 
+echo "[start] Optimizing..."
 php artisan optimize
 
 # -------------------------------
@@ -121,10 +111,18 @@ php artisan optimize
 
 APP_PORT="${PORT:-80}"
 
-echo "[start] Listening on port ${APP_PORT}"
-
 sed -i "s/__PORT__/${APP_PORT}/g" \
     /etc/apache2/ports.conf \
     /etc/apache2/sites-available/000-default.conf
+
+# Make sure only one MPM is enabled
+a2dismod mpm_event >/dev/null 2>&1 || true
+a2dismod mpm_worker >/dev/null 2>&1 || true
+a2enmod mpm_prefork >/dev/null 2>&1 || true
+
+echo "[start] Enabled Apache modules:"
+apache2ctl -M
+
+echo "[start] Listening on port ${APP_PORT}"
 
 exec apache2-foreground
