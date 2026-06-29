@@ -41,3 +41,8 @@ storage/logs/*.log
 storage/framework/cache/data
 storage/framework/sessions
 storage/framework/views
+# Vendor — Dockerfile runs `composer install` fresh; never ship local vendor
+vendor
+
+# Supabase CLI local cache — contains project ref / pooler URL, never ship
+supabase/.temp
