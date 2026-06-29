@@ -85,4 +85,14 @@ fi
 php artisan storage:link --force
 
 echo "[start] Boot complete. Starting Apache..."
+
+# ── Bind to Railway's dynamic port ───────────────────────────────────────────
+# Railway assigns a different PORT each deploy and routes its healthcheck
+# (/up) to that port specifically. The Dockerfile bakes in a __PORT__
+# placeholder (it doesn't know the real port at build time); swap in the
+# live value now, right before Apache starts listening.
+APP_PORT="${PORT:-80}"
+echo "[start] Binding Apache to port ${APP_PORT}..."
+sed -i "s/__PORT__/${APP_PORT}/g" /etc/apache2/ports.conf /etc/apache2/sites-available/000-default.conf
+
 exec apache2-foreground

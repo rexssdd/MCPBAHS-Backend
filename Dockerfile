@@ -55,8 +55,12 @@ RUN rm -rf /app/public/storage
 # Enable Apache modules
 RUN a2enmod rewrite headers
 
-# Configure Apache virtual host
-RUN echo '<VirtualHost *:80>\n\
+# Configure Apache virtual host with a literal placeholder port.
+# Railway only assigns the real $PORT at container start (not build time),
+# so start.sh replaces __PORT__ with the live value via sed before Apache
+# launches. (Relying on Apache's own ${ENV} config interpolation here would
+# be version-fragile, so we do the substitution explicitly ourselves.)
+RUN echo '<VirtualHost *:__PORT__>\n\
     DocumentRoot /app/public\n\
     <Directory /app/public>\n\
         Options Indexes FollowSymLinks\n\
@@ -64,6 +68,7 @@ RUN echo '<VirtualHost *:80>\n\
         Require all granted\n\
     </Directory>\n\
 </VirtualHost>' > /etc/apache2/sites-available/000-default.conf
+RUN sed -i 's/Listen 80/Listen __PORT__/' /etc/apache2/ports.conf
 
 # Create storage directories and set permissions
 RUN mkdir -p /app/storage/app/private/reports \
@@ -76,6 +81,8 @@ RUN mkdir -p /app/storage/app/private/reports \
     && chown -R www-data:www-data /app/storage /app/bootstrap/cache \
     && chmod -R 775 /app/storage /app/bootstrap/cache
 
+# Documentation only — Railway ignores EXPOSE and routes to whatever $PORT
+# the container actually listens on (set at runtime by start.sh).
 EXPOSE 80
 
 CMD ["sh", "/app/start.sh"]
