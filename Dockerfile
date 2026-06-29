@@ -10,18 +10,28 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP extensions
+# Install PHP extensions
 RUN docker-php-ext-install \
     pdo \
     pdo_pgsql \
     pcntl
 
-# Composer
+# Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# Copy project
+# Copy Composer files first (better cache)
+COPY composer.json composer.lock ./
+
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-scripts
+
+# Copy application
 COPY . .
 
 # Laravel directories
@@ -36,24 +46,19 @@ RUN mkdir -p \
 RUN chown -R www-data:www-data storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache
 
-# Install dependencies
-RUN composer install \
-    --no-dev \
-    --no-interaction \
-    --prefer-dist \
-    --optimize-autoloader \
-    --no-scripts
-
-# Remove cached config
+# Remove cached bootstrap files
 RUN rm -f bootstrap/cache/*.php
 
 # Remove storage symlink
 RUN rm -rf public/storage
 
-# ONLY enable rewrite and headers
+# Enable required Apache modules
 RUN a2enmod rewrite headers
 
-# Apache VirtualHost
+# Suppress Apache ServerName warning
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
+
+# Configure VirtualHost
 RUN cat > /etc/apache2/sites-available/000-default.conf <<'EOF'
 <VirtualHost *:__PORT__>
     ServerName localhost
@@ -70,9 +75,9 @@ RUN cat > /etc/apache2/sites-available/000-default.conf <<'EOF'
 </VirtualHost>
 EOF
 
-# Dynamic Railway port
+# Replace port placeholder
 RUN sed -i 's/Listen 80/Listen __PORT__/g' /etc/apache2/ports.conf
 
 EXPOSE 80
 
-CMD ["sh","/app/start.sh"]
+CMD ["sh", "/app/start.sh"]
