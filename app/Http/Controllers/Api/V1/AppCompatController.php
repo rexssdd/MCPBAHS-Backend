@@ -873,8 +873,16 @@ class AppCompatController extends Controller
 
         $todayAbbrev = now()->format('D'); // "Mon", "Tue", ...
         $todayClasses = $schedules->filter(function (ClassSchedule $s) use ($todayAbbrev) {
-            $days = $s->days ?? '';
-            return $days === '' || str_contains($days, $todayAbbrev);
+            $days = $s->days; // cast to array on the model
+            if (empty($days)) {
+                return true;
+            }
+            if (is_string($days)) {
+                return str_contains($days, $todayAbbrev);
+            }
+            return collect($days)->contains(
+                fn ($d) => str_contains(strtolower((string) $d), strtolower($todayAbbrev))
+            );
         })->count();
 
         $schedulePayload = $schedules->values()->map(function (ClassSchedule $s, int $i) {
@@ -1421,7 +1429,8 @@ class AppCompatController extends Controller
 
     private function schedulePayload(ClassSchedule $schedule): array
     {
-        $days = $schedule->days ?: 'Mon-Fri';
+        $rawDays = $schedule->days;
+        $days = is_array($rawDays) ? implode(', ', $rawDays) : ($rawDays ?: 'Mon-Fri');
         $start = $schedule->start_time ? Carbon::parse($schedule->start_time)->format('g:i a') : '';
         $end = $schedule->end_time ? Carbon::parse($schedule->end_time)->format('g:i a') : '';
 
