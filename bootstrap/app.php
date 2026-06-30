@@ -26,11 +26,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'throttle:api',
         ]);
 
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
-
-        $middleware->alias([
+        // NOTE: EnsureFrontendRequestsAreStateful was previously prepended here,
+        // but this app uses Sanctum *token* auth (Authorization: Bearer <token>),
+        // not Sanctum's cookie-session SPA mode. With the stateful middleware
+        // active, any request from a SANCTUM_STATEFUL_DOMAINS origin sending
+        // credentials:"include" (e.g. the Vercel frontend) was being treated as
+        // a CSRF-protected session request, causing 419 on /api/login since the
+        // SPA never calls /sanctum/csrf-cookie. Removed — not needed for
+        // cross-domain Bearer-token auth (Vercel frontend + Railway backend).
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
