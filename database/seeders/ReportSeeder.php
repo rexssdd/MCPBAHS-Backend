@@ -52,6 +52,10 @@ class ReportSeeder extends Seeder
                 $filename = strtoupper($type->value) . '-' . $faker->unique()->numerify('####') . '.pdf';
 
                 Report::create([
+                    // DatabaseSeeder wraps all seeders in WithoutModelEvents, which
+                    // disables the `creating` event HasPublicUuid relies on to
+                    // auto-generate this — must set it explicitly here.
+                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
                     'form_type' => $type,
                     'school_year' => $faker->randomElement($schoolYears),
                     'file_path' => 'reports/' . $filename,
