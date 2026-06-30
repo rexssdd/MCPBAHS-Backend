@@ -26,8 +26,11 @@ class PublicController extends Controller
      * GET /api/v1/public/calendar-events
      *
      * Consumed by CalendarSection.jsx. Returns every published event
-     * (past + future) so the homepage calendar can be paged month to
-     * month without extra round trips.
+     * (past + future) created by admin/principal in calendar_events, plus
+     * announcements posted by the principal (folded in as read-only
+     * "Announcement" calendar entries on their posted date), so the public
+     * calendar reflects principal communications without staff having to
+     * duplicate the same date into two places.
      */
     public function calendarEvents()
     {
@@ -41,10 +44,30 @@ class PublicController extends Controller
                 'tag'      => ucfirst($event->category),
                 'title'    => $event->title,
                 'desc'     => $event->description,
-            ])
+            ]);
+
+        $principalAnnouncements = Announcement::query()
+            ->where('status', AnnouncementStatus::Posted->value)
+            ->whereNotNull('posted_at')
+            ->whereHas('creator', fn ($q) => $q->role('principal'))
+            ->orderByDesc('posted_at')
+            ->limit(20)
+            ->get()
+            ->map(fn (Announcement $announcement) => [
+                'id'    => 'announcement-' . $announcement->uuid,
+                'date'  => optional($announcement->posted_at)->format('Y-m-d'),
+                'tag'   => 'Announcement',
+                'title' => $announcement->title,
+                'desc'  => $announcement->message,
+            ]);
+
+        $merged = $events
+            ->concat($principalAnnouncements)
+            ->filter(fn ($item) => ! empty($item['date']))
+            ->sortBy('date')
             ->values();
 
-        return response()->json(['data' => $events]);
+        return response()->json(['data' => $merged]);
     }
 
     /**
@@ -63,6 +86,7 @@ class PublicController extends Controller
                 'title'          => $offer->title,
                 'description'    => $offer->description,
                 'icon'           => $offer->icon,
+                'image_url'      => $offer->image_url,
                 'tag'            => 'TVL – ' . $offer->title,
                 'tesda'          => collect($offer->certifications ?? [])->first() ?? 'NC II Eligible',
                 'certifications' => $offer->certifications ?? [],
@@ -136,7 +160,7 @@ class PublicController extends Controller
                     'lastName'   => $person->last_name,
                     'role'       => str_contains(strtoupper($position), 'TEACHER') ? 'Teacher' : 'Non-Teaching',
                     'department' => ucwords(strtolower(str_replace(['_', '-'], ' ', $position))),
-                    'photo_url'  => null,
+                    'photo_url'  => $person->photo_url,
                 ];
             })
             ->values();

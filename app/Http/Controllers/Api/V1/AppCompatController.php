@@ -474,6 +474,38 @@ class AppCompatController extends Controller
     }
 
     /**
+     * POST /faculty/{personnel}/photo
+     * Frontend-facing alias for PersonnelController::uploadPhoto(), so the
+     * admin "Faculty and Staff" form (which talks to /faculty, not
+     * /personnels) can upload a profile photo for the public homepage
+     * faculty directory.
+     */
+    public function facultyUploadPhoto(Request $request, Personnel $personnel): array
+    {
+        abort_unless(
+            $request->user()?->hasAnyRole(['admin', 'principal']),
+            403,
+            'Only admins and principals may update faculty photos.'
+        );
+
+        $request->validate([
+            'photo' => ['required', 'image', 'max:4096'],
+        ]);
+
+        $disk = \Illuminate\Support\Facades\Storage::disk(config('filesystems.default'));
+
+        if ($personnel->photo_path && $disk->exists($personnel->photo_path)) {
+            $disk->delete($personnel->photo_path);
+        }
+
+        $personnel->update([
+            'photo_path' => $request->file('photo')->store('personnel-photos', config('filesystems.default')),
+        ]);
+
+        return $this->facultyPayload($personnel->refresh());
+    }
+
+    /**
      * GET /faculty/{personnel:uuid}/rpms?schoolYear=2024-2025&quarter=Q3
      * Returns the RPMS report for a faculty member. Returns empty structure if none exists yet.
      */
@@ -1229,6 +1261,7 @@ class AppCompatController extends Controller
             'status' => $this->statusHuman($personnel->employment_status),
             'teachingLoad' => [],
             'advisory' => null,
+            'photoUrl' => $personnel->photo_url,
         ];
     }
 

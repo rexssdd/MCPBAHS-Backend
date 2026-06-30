@@ -32,7 +32,10 @@ class TvlOfferSeeder extends Seeder
                 'icon' => $track['icon'],
                 'certifications' => $track['certs'],
                 'display_order' => $index + 1,
-                'is_active' => true,
+                // Intentionally omitted: 'is_active' => true — see the note
+                // in CalendarEventSeeder about PDO pgsql binding PHP booleans
+                // as bare integer literals. The migration already defaults
+                // this column to true.
             ]);
         }
     }

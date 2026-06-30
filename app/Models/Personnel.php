@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property Sex $sex
@@ -57,6 +58,12 @@ class Personnel extends Model
         'position',
         'department',
         'employment_status',
+
+        'photo_path',
+    ];
+
+    protected $appends = [
+        'photo_url',
     ];
 
     protected $hidden = [
@@ -99,5 +106,19 @@ class Personnel extends Model
         ])
         ->filter()
         ->implode(' ');
+    }
+
+    /**
+     * Public, signed-URL-free link to the personnel's profile photo so the
+     * public faculty directory can show real faces. Returns null when no
+     * photo has been uploaded yet so the frontend can fall back to initials.
+     */
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (empty($this->photo_path)) {
+            return null;
+        }
+
+        return Storage::disk(config('filesystems.default'))->url($this->photo_path);
     }
 }

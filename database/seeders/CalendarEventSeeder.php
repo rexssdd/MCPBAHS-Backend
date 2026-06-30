@@ -46,7 +46,13 @@ class CalendarEventSeeder extends Seeder
                 'description' => $event['desc'],
                 'event_date' => $now->copy()->addDays($event['days'])->toDateString(),
                 'category' => $event['category'],
-                'is_published' => true,
+                // Intentionally omitted: 'is_published' => true.
+                // Binding a PHP bool through PDO pgsql under emulated prepares
+                // sends it as the bare literal `1`, and Postgres refuses to
+                // implicitly cast an integer literal into a `boolean` column
+                // ("column is of type boolean but expression is of type
+                // integer"). The migration already defaults this column to
+                // true, so just let the database apply it instead.
                 'created_by' => $author?->id,
             ]);
         }

@@ -99,6 +99,35 @@ class PersonnelController extends Controller
         return response()->noContent();
     }
 
+    /**
+     * Upload / replace the personnel's profile photo.
+     *
+     * Used by the admin "Faculty and Staff" form so personnel records have
+     * a real photo, which then flows through to the public homepage faculty
+     * directory (GET /v1/public/faculty) via Personnel::photo_url.
+     */
+    public function uploadPhoto(Request $request, Personnel $personnel)
+    {
+        $request->validate([
+            'photo' => ['required', 'image', 'max:4096'],
+        ]);
+
+        $disk = \Illuminate\Support\Facades\Storage::disk(config('filesystems.default'));
+
+        if ($personnel->photo_path && $disk->exists($personnel->photo_path)) {
+            $disk->delete($personnel->photo_path);
+        }
+
+        $path = $request->file('photo')->store('personnel-photos', config('filesystems.default'));
+
+        $personnel->update(['photo_path' => $path]);
+
+        return response()->json([
+            'message' => 'Photo uploaded successfully.',
+            'data' => new PersonnelResource($personnel->refresh()),
+        ]);
+    }
+
     // will be used later, for now it will be resolved automatically by the system
     // public function assignUser(
     //     AssignPersonnelUserRequest $request,

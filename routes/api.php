@@ -2,12 +2,14 @@
 
 use App\Http\Controllers\Api\V1\AnnouncementController;
 use App\Http\Controllers\Api\V1\AppCompatController;
+use App\Http\Controllers\Api\V1\CalendarEventController;
 use App\Http\Controllers\Api\V1\ClassScheduleController;
 use App\Http\Controllers\Api\V1\LearnerController;
 use App\Http\Controllers\Api\V1\PersonnelController;
 use App\Http\Controllers\Api\V1\PrincipalDashboardController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\SectionController;
+use App\Http\Controllers\Api\V1\TvlOfferController;
 use App\Http\Controllers\Api\V1\Users\UserController;
 use App\Http\Controllers\Api\V1\Users\UserInvitationController;
 use App\Http\Controllers\Api\V1\Users\UserPasswordController;
@@ -130,6 +132,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
             Route::put('faculty/{personnel:uuid}', 'facultyUpdate');
             Route::patch('faculty/{personnel:uuid}/archive', 'facultyArchive');
             Route::delete('faculty/{personnel:uuid}', 'facultyDestroy');
+            Route::post('faculty/{personnel:uuid}/photo', 'facultyUploadPhoto');
             // RPMS (Results-Based Performance Management System) endpoints
             Route::get('faculty/{personnel:uuid}/rpms', 'facultyRpms');
             Route::post('faculty/{personnel:uuid}/rpms/generate', 'facultyRpmsGenerate');
@@ -217,8 +220,21 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
                 Route::patch('personnels/{personnel:uuid}/restore', 'restore')->withTrashed();
                 Route::delete('personnels/{personnel:uuid}/force', 'forceDelete')->withTrashed();
                 Route::post('personnels/{personnel:uuid}/assign-user', 'assignUser');
+                Route::post('personnels/{personnel:uuid}/photo', 'uploadPhoto');
                 Route::apiResource('personnels', PersonnelController::class)->whereUuid('personnel');
             });
+        });
+
+        // TVL offers — admin only, manages the public homepage TVL section
+        // (title, description, icon, certifications, and now an image).
+        Route::middleware('role:admin')->group(function () {
+            Route::apiResource('tvl-offers', TvlOfferController::class)->whereUuid('tvl_offer');
+        });
+
+        // Calendar events — admin and principal can both create/manage the
+        // public homepage events calendar.
+        Route::middleware('role:admin|principal')->group(function () {
+            Route::apiResource('calendar-events', CalendarEventController::class)->whereUuid('calendar_event');
         });
 
 

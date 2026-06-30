@@ -36,6 +36,8 @@ class PersonnelResource extends JsonResource
             'teaching_load' => $this->teaching_load,
             'department' => $this->department,
 
+            'photo_url' => $this->photo_url,
+
             'address' => [
                 'country' => $this->country,
                 'region' => $this->region,
