@@ -859,6 +859,17 @@ class AppCompatController extends Controller
         return response()->noContent();
     }
 
+    public function teacherDashboard(Request $request)
+    {
+    $user = $request->user();
+
+    return response()->json([
+        'totalStudents' => Learner::count(),
+        'totalSections' => Section::count(),
+        'todayClasses' => ClassSchedule::count(),
+        'pendingReports' => Report::where('status', 'pending')->count(),
+    ]);
+    }
     public function teacherSections(Request $request): array
     {
         // FIX: load learner counts in one query, then map — avoids N+1 in sectionPayload.

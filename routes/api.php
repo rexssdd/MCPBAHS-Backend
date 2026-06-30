@@ -193,7 +193,14 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
             Route::get('users/{user:uuid}/activity-logs', 'userActivityLogs');
             Route::post('activity-logs', 'logActivity');
 
-            // Teacher dashboard assistant endpoints.
+            // ------------------------------------------------------------------
+            // Teacher Dashboard
+            // ------------------------------------------------------------------
+
+            // Dashboard statistics
+            Route::get('teacher/dashboard', 'teacherDashboard');
+
+            // Teacher AI assistant
             Route::post('teacher/dashboard/{tool}', 'dashboardAi')
                 ->whereIn('tool', [
                     'enrollment-insights',
