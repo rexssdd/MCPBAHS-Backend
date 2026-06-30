@@ -52,8 +52,11 @@ RUN rm -f /app/bootstrap/cache/config.php \
 # (storage:link refuses to overwrite an existing non-symlink path.)
 RUN rm -rf /app/public/storage
 
-# Enable Apache modules
-RUN a2enmod rewrite headers
+# Enable Apache modules. mod_php is not thread-safe and requires mpm_prefork —
+# the base php:apache image can ship with mpm_event also enabled, which causes
+# "AH00534: More than one MPM loaded" at startup. Force prefork explicitly.
+RUN a2dismod mpm_event mpm_worker 2>/dev/null; \
+    a2enmod mpm_prefork rewrite headers
 
 # Configure Apache virtual host with a literal placeholder port.
 # Railway only assigns the real $PORT at container start (not build time),
