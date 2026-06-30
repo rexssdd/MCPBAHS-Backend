@@ -23,13 +23,16 @@ Route::middleware('signed')->prefix('v1')->group(function () {
 
 Route::get('/school/dashboard', [AppCompatController::class, 'schoolDashboard']);
 
-// Public landing-page data — intentionally unauthenticated, and intentionally
-// narrower than their auth:sanctum counterparts (facultyIndex/announcements
-// resource route): no contact info, no draft/scheduled/internal-audience
-// announcements. See AppCompatController::facultyPublic / announcementsPublic.
-Route::prefix('v1')->controller(AppCompatController::class)->group(function () {
-    Route::get('public/faculty', 'facultyPublic');
-    Route::get('public/announcements', 'announcementsPublic');
+// Public, unauthenticated homepage endpoints (HomePage.jsx sections).
+// CalendarSection / TVLSection previously called relative paths that did
+// not exist on the backend at all; AnnouncementsSection / FacultySection
+// previously called routes that either required auth or had been removed
+// for security, so they always silently fell back to sample data.
+Route::prefix('v1/public')->controller(\App\Http\Controllers\Api\V1\PublicController::class)->group(function () {
+    Route::get('calendar-events', 'calendarEvents');
+    Route::get('tvl-offers', 'tvlOffers');
+    Route::get('announcements', 'announcements');
+    Route::get('faculty', 'faculty');
 });
 
 Route::prefix('v1')->controller(AppCompatController::class)->group(function () {

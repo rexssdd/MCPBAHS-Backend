@@ -6,20 +6,29 @@ use App\Models\Learner;
 use App\Models\Section;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
  * LearnerSeeder
  *
  * Seeds learners (enrolled students) and distributes them across the
- * sections created by SectionSeeder. Field names match the actual
- * `learners` table (see database/migrations/..._create_learners_table.php
- * and App\Models\Learner::$fillable) — NOT the old enrollment-form field
- * names this seeder previously (incorrectly) assumed.
+ * sections created by SectionSeeder. Field names mirror the DepEd
+ * enrollment form fields used on the frontend (G7Form.jsx EMPTY_FORM)
+ * converted to snake_case, matching the convention already used by
+ * enrollmentService.js (first_name, last_name, birth_date, contact_number…):
  *
+ *   learner_id, lrn, last_name, first_name, middle_name, name_ext,
+ *   birth_date, sex, age, mother_tongue, religion, place_of_birth,
+ *   is_ip, ip_specify, is_4ps, household_id, is_pwd,
+ *   house_no, barangay, street_name, municipality, province, country,
+ *   zip_code, contact_number,
+ *   father_last, father_first, father_middle,
+ *   mother_last, mother_first, mother_middle,
+ *   grade_level, section_id, enrollment_status, school_year
+ *
+ * ── ASSUMPTIONS — adjust to match your actual schema if different ──
  *   • Model: App\Models\Learner   (table: learners)
- *   • FK:    learners.section_assignment_id → sections.id
+ *   • FK:    learners.section_id  → sections.id
  *   • Run AFTER SectionSeeder (sections must exist first).
  */
 class LearnerSeeder extends Seeder
@@ -54,7 +63,8 @@ class LearnerSeeder extends Seeder
     public function run(): void
     {
         if (! class_exists(Learner::class)) {
-            $this->command?->warn('LearnerSeeder: App\\Models\\Learner not found — skipping.');
+            $this->command?->warn('LearnerSeeder: App\\Models\\Learner not found — skipping. '
+                . 'Update the model namespace in LearnerSeeder.php if your model lives elsewhere.');
             return;
         }
 
@@ -73,30 +83,21 @@ class LearnerSeeder extends Seeder
                 $sex   = $this->randomItem(['Male', 'Female']);
                 $first = $this->randomItem($this->firstNames);
                 $last  = $this->randomItem($this->lastNames);
-                $lrn   = (string) $lrnSequence;
 
                 Learner::updateOrCreate(
                     [
                         // Treat LRN as the natural unique key so re-running
                         // the seeder doesn't duplicate learners.
-                        'lrn' => $lrn,
+                        'lrn' => (string) $lrnSequence,
                     ],
                     [
-                        'uuid'             => (string) Str::uuid(),
-                        'school_year'      => $section->school_year ?? $schoolYear,
-                        'grade_to_enroll'  => $section->grade_level,
-                        'learner_type'     => 'old student',
-                        'enrollment_status' => 'enrolled',
-
-                        'section_assignment_id' => $section->id,
-
-                        'has_lrn' => DB::raw('true'),
-                        'lrn'     => $lrn,
+                        'uuid'           => (string) Str::uuid(),
+                        'learner_id'     => 'LRN-' . $schoolYear . '-' . str_pad((string) ($lrnSequence % 100000), 5, '0', STR_PAD_LEFT),
 
                         'last_name'      => $last,
                         'first_name'     => $first,
                         'middle_name'    => $this->randomItem($this->middleNames),
-                        'name_extension' => null,
+                        'name_ext'       => null,
 
                         'birth_date'     => $this->randomBirthDateForGrade($section->grade_level),
                         'sex'            => $sex,
@@ -105,38 +106,33 @@ class LearnerSeeder extends Seeder
                         'religion'       => $this->randomItem(['Roman Catholic', 'Iglesia ni Cristo', 'Born Again Christian', 'Islam']),
                         'place_of_birth' => 'Quezon City',
 
-                        'is_ip'             => DB::raw('false'),
-                        'ip_specification'  => null,
-                        'is_4ps'            => DB::raw($this->randomItem(['true', 'false', 'false', 'false'])),
-                        'household_id_number' => null,
-                        'is_pwd'            => DB::raw('false'),
-                        'pwd_specification' => null,
+                        'is_ip'          => 'No',
+                        'ip_specify'     => null,
+                        'is_4ps'         => $this->randomItem(['Yes', 'No', 'No', 'No']),
+                        'household_id'   => null,
+                        'is_pwd'         => 'No',
 
-                        'house_no_street' => (string) random_int(1, 999),
-                        'street_name'     => 'Sampaguita Street',
-                        'barangay'        => $this->randomItem($this->barangays),
-                        'municipality'    => 'Quezon City',
-                        'province'        => 'Metro Manila',
-                        'country'         => 'Philippines',
-                        'zip_code'        => '1121',
-                        'contact_number'  => '09' . random_int(100000000, 999999999),
+                        'house_no'       => (string) random_int(1, 999),
+                        'barangay'       => $this->randomItem($this->barangays),
+                        'street_name'    => 'Sampaguita Street',
+                        'municipality'   => 'Quezon City',
+                        'province'       => 'Metro Manila',
+                        'country'        => 'Philippines',
+                        'zip_code'       => '1121',
+                        'contact_number' => '09' . random_int(100000000, 999999999),
 
-                        'father_last_name'   => $last,
-                        'father_first_name'  => $this->randomItem($this->firstNames),
-                        'father_middle_name' => $this->randomItem($this->middleNames),
+                        'father_last'    => $last,
+                        'father_first'   => $this->randomItem($this->firstNames),
+                        'father_middle'  => $this->randomItem($this->middleNames),
 
-                        'mother_last_name'   => $this->randomItem($this->lastNames),
-                        'mother_first_name'  => $this->randomItem($this->firstNames),
-                        'mother_middle_name' => $this->randomItem($this->middleNames),
+                        'mother_last'    => $this->randomItem($this->lastNames),
+                        'mother_first'   => $this->randomItem($this->firstNames),
+                        'mother_middle'  => $this->randomItem($this->middleNames),
 
-                        'last_grade_completed' => $this->previousGrade($section->grade_level),
-
-                        'academic_track'  => $section->academic_track,
-                        'academic_strand' => $section->academic_strand,
-
-                        'image_usage_consent'  => DB::raw('true'),
-                        'data_privacy_consent' => DB::raw('true'),
-                        'consented_at'         => now(),
+                        'grade_level'      => $section->grade_level,
+                        'section_id'       => $section->id,
+                        'school_year'      => $section->school_year ?? $schoolYear,
+                        'enrollment_status' => 'enrolled',
                     ]
                 );
 
@@ -160,13 +156,6 @@ class LearnerSeeder extends Seeder
         $num = (int) preg_replace('/\D/', '', $gradeLevel);
         $num = $num ?: 7;
         return min(18, max(11, $num + 5));
-    }
-
-    private function previousGrade(string $gradeLevel): string
-    {
-        $num = (int) preg_replace('/\D/', '', $gradeLevel);
-        $num = $num ?: 7;
-        return $num <= 1 ? 'Kinder' : 'Grade ' . ($num - 1);
     }
 
     private function randomBirthDateForGrade(string $gradeLevel): string

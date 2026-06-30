@@ -31,6 +31,8 @@ class DatabaseSeeder extends Seeder
             SectionSeeder::class,
             LearnerSeeder::class,
             ClassScheduleSeeder::class,
+            CalendarEventSeeder::class,
+            TvlOfferSeeder::class,
         ]);
     }
 }

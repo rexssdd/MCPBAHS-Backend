@@ -44,13 +44,11 @@ class SectionSeeder extends Seeder
         'Grade 10' => ['Diligence', 'Integrity', 'Excellence'],
     ];
 
-    // Keys must match App\Enums\Sections\AcademicTrack values exactly
-    // (the column has a DB check constraint against those enum values).
     private array $tracks = [
-        'Academic' => ['STEM', 'ABM', 'HUMSS', 'GAS'],
-        'TVL'       => [null],
-        'Sports'    => [null],
-        'Arts and Design' => [null],
+        'Academic Track' => ['STEM', 'ABM', 'HUMSS', 'GAS'],
+        'TVL Track'       => ['Home Economics', 'ICT', 'Agri-Fishery Arts'],
+        'Sports Track'    => [null],
+        'Arts and Design Track' => [null],
     ];
 
     public function run(): void
