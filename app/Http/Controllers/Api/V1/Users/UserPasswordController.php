@@ -35,7 +35,7 @@ class UserPasswordController extends Controller
     {
         $otpRecord = UserPasswordOtp::query()
             ->where('user_id', $user->id)
-            ->where('used', false)
+            ->whereRaw('used = false')
             ->latest()
             ->first();
 

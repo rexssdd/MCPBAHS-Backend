@@ -281,7 +281,7 @@ class AppCompatController extends Controller
 
         // Also count unread DB notification records for the current user.
         $dbUnread = $user
-            ? Notification::query()->where('user_id', $user->id)->where('is_read', false)->count()
+            ? Notification::query()->where('user_id', $user->id)->whereRaw('is_read = false')->count()
             : 0;
 
         return ['count' => $reportCount + $annCount + $dbUnread];
@@ -335,7 +335,7 @@ class AppCompatController extends Controller
         if ($user) {
             Notification::query()
                 ->where('user_id', $user->id)
-                ->where('is_read', false)
+                ->whereRaw('is_read = false')
                 ->update(['is_read' => true]);
         }
 
