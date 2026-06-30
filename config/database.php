@@ -97,6 +97,15 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Supabase's Supavisor pooler in transaction mode (port 6543) can route
+            // each query to a different underlying Postgres connection. Native
+            // server-side prepared statements (PDO's default) get orphaned when
+            // that happens, causing "prepared statement ... does not exist"
+            // errors on every other request. Emulating prepares client-side
+            // avoids relying on connection-pinned statement names entirely.
+            'options' => [
+                \PDO::ATTR_EMULATE_PREPARES => true,
+            ],
         ],
 
         'sqlsrv' => [
