@@ -861,14 +861,112 @@ class AppCompatController extends Controller
 
     public function teacherDashboard(Request $request)
     {
-    $user = $request->user();
+        $user = $request->user();
+        $personnel = $user ? Personnel::query()->where('user_id', $user->id)->first() : null;
 
-    return response()->json([
-        'totalStudents' => Learner::count(),
-        'totalSections' => Section::count(),
-        'todayClasses' => ClassSchedule::count(),
-        'pendingReports' => Report::where('status', 'pending')->count(),
-    ]);
+        // Schedule — real ClassSchedule rows for this teacher, ordered by start time.
+        $schedulesQuery = ClassSchedule::query()->with('section');
+        if ($personnel) {
+            $schedulesQuery->where('teacher_id', $personnel->id);
+        }
+        $schedules = $schedulesQuery->orderBy('start_time')->get();
+
+        $todayAbbrev = now()->format('D'); // "Mon", "Tue", ...
+        $todayClasses = $schedules->filter(function (ClassSchedule $s) use ($todayAbbrev) {
+            $days = $s->days ?? '';
+            return $days === '' || str_contains($days, $todayAbbrev);
+        })->count();
+
+        $schedulePayload = $schedules->values()->map(function (ClassSchedule $s, int $i) {
+            $start = $s->start_time ? Carbon::parse($s->start_time)->format('g:i A') : '';
+            $end   = $s->end_time   ? Carbon::parse($s->end_time)->format('g:i A')   : '';
+            return [
+                'period'  => ($i + 1) . $this->ordinalSuffix($i + 1) . ' Period',
+                'time'    => trim("{$start} – {$end}", ' –'),
+                'subject' => $s->subject,
+                'section' => $s->section?->section_name ?? '—',
+                'room'    => $s->room_no ?? '—',
+            ];
+        })->values()->all();
+
+        // Sections / students this teacher actually teaches, via their schedules.
+        $sectionIds = $schedules->pluck('section.id')->filter()->unique()->values();
+        $totalSections = $sectionIds->count();
+        $totalStudents = $totalSections > 0
+            ? Learner::query()->whereIn('section_assignment_id', $sectionIds)->count()
+            : 0;
+
+        // Upcoming announcements double as calendar events (same source the
+        // Principal dashboard uses for its events() endpoint).
+        $calendarEvents = Announcement::query()
+            ->whereNotNull('scheduled_at')
+            ->where('scheduled_at', '>=', Carbon::today())
+            ->orderBy('scheduled_at')
+            ->limit(8)
+            ->get()
+            ->map(fn (Announcement $a) => [
+                'date'  => Carbon::parse($a->scheduled_at)->format('M j'),
+                'type'  => $this->teacherAnnouncementType($a->urgency),
+                'label' => $a->title ?? mb_strimwidth($a->message ?? 'Event', 0, 80, '…'),
+            ])
+            ->values()
+            ->all();
+
+        // Reports this teacher has submitted that are still awaiting a decision.
+        $pendingReports = $user
+            ? Report::query()
+                ->where('submitted_by', $user->id)
+                ->where('status', ReportStatus::ForAdminApproval->value)
+                ->count()
+            : 0;
+
+        // Attendance, grades, low performers, and subject performance have no
+        // backing tables in this schema yet — returned as real empty states
+        // rather than fabricated numbers, so the UI shows "no data" instead of
+        // silently displaying stale mock figures.
+        return response()->json([
+            'stats' => [
+                'presentToday'  => 0,
+                'totalStudents' => $totalStudents,
+                'pendingGrades' => 0,
+                'lowPerformers' => 0,
+                'upcomingEvents' => count($calendarEvents),
+                'classAverage'  => null,
+            ],
+            'attendance'         => [],
+            'grades'             => [],
+            'lowPerformers'      => [],
+            'schedule'           => $schedulePayload,
+            'calendarEvents'     => $calendarEvents,
+            'notifications'      => [],
+            'subjectPerformance' => [],
+            'recentActivities'   => [],
+            // Kept for any older consumers still reading the flat shape.
+            'totalSections'  => $totalSections,
+            'todayClasses'   => $todayClasses,
+            'pendingReports' => $pendingReports,
+        ]);
+    }
+
+    private function ordinalSuffix(int $n): string
+    {
+        if (in_array($n % 100, [11, 12, 13], true)) return 'th';
+        return match ($n % 10) {
+            1 => 'st',
+            2 => 'nd',
+            3 => 'rd',
+            default => 'th',
+        };
+    }
+
+    private function teacherAnnouncementType(mixed $urgency): string
+    {
+        $value = is_object($urgency) && property_exists($urgency, 'value') ? $urgency->value : $urgency;
+        return match ($value) {
+            'high' => 'alert',
+            'medium' => 'warn',
+            default => 'info',
+        };
     }
     public function teacherSections(Request $request): array
     {
