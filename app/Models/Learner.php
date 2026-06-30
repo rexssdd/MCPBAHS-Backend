@@ -9,7 +9,6 @@ use App\Traits\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 /**
  * @property mixed $learner_type
@@ -25,12 +24,12 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
  */
 class Learner extends Model
 {
-    use HasUuids, SoftDeletes;
+    use HasPublicUuid, SoftDeletes;
 
-protected $keyType = 'string';
-
-public $incrementing = false;
      protected $fillable = [
+
+        // identifier exposed publicly
+        'uuid',
 
         // enrollment context
         'school_year',

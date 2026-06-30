@@ -18,6 +18,7 @@ use App\Models\Section;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -148,8 +149,8 @@ class AppCompatController extends Controller
      */
     public function notifications(): array
     {
-        /** @var \App\Models\User $user */
-        $user  = auth()->user();
+        /** @var User $user */
+        $user  = Auth::user();
         $items = [];
 
         // ── 1. Announcements ─────────────────────────────────────────────────
@@ -270,8 +271,8 @@ class AppCompatController extends Controller
 
     public function notificationsUnreadCount(): array
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         $reportCount = Report::query()
             ->whereIn('status', [ReportStatus::Approved->value, ReportStatus::Rejected->value])
@@ -288,7 +289,7 @@ class AppCompatController extends Controller
     }
 
     /** Map a Carbon date (or null) to Today / Yesterday / Earlier. */
-    private function notifGroup($date): string
+    private function notifGroup(string|Carbon|null $date): string
     {
         if (! $date) return 'Earlier';
         try {
@@ -309,8 +310,8 @@ class AppCompatController extends Controller
      */
     public function markNotificationRead(string $id): \Illuminate\Http\Response
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         if ($user && str_starts_with($id, 'db-')) {
             $numericId = (int) substr($id, 3);
@@ -329,8 +330,8 @@ class AppCompatController extends Controller
      */
     public function markAllNotificationsRead(): \Illuminate\Http\Response
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         if ($user) {
             Notification::query()
@@ -348,8 +349,8 @@ class AppCompatController extends Controller
      */
     public function deleteNotification(string $id): \Illuminate\Http\Response
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         if ($user && str_starts_with($id, 'db-')) {
             $numericId = (int) substr($id, 3);
@@ -367,8 +368,8 @@ class AppCompatController extends Controller
      */
     public function clearNotifications(): \Illuminate\Http\Response
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         if ($user) {
             Notification::query()->where('user_id', $user->id)->delete();
@@ -631,9 +632,44 @@ class AppCompatController extends Controller
         $learner->forceFill([
             'enrollment_status' => EnrollmentStatus::Enrolled->value,
             'approved_at' => now(),
-        ])->save();
+        ]);
+
+        if (! $learner->section_assignment_id) {
+            $learner->section_assignment_id = $this->assignSection($learner)?->id;
+        }
+
+        $learner->save();
 
         return $this->enrolleePayload($learner->fresh());
+    }
+
+    /**
+     * Pick the best-fit section for a learner at enrollment time.
+     *
+     * Matches on grade level + school year (and, for Senior High, the
+     * learner's chosen academic track/strand), then load-balances across
+     * matching sections by picking whichever has the fewest learners,
+     * skipping any section already at SECTION_CAPACITY.
+     */
+    private function assignSection(Learner $learner): ?Section
+    {
+        $query = Section::query()
+            ->where('grade_level', $learner->grade_to_enroll)
+            ->where('school_year', $learner->school_year)
+            ->withCount('learners');
+
+        if ($learner->academic_track) {
+            $query->where('academic_track', $learner->academic_track);
+        }
+
+        if ($learner->academic_strand) {
+            $query->where('academic_strand', $learner->academic_strand);
+        }
+
+        return $query->get()
+            ->filter(fn (Section $section) => $section->learners_count < self::SECTION_CAPACITY)
+            ->sortBy('learners_count')
+            ->first();
     }
 
     public function enrolleesReject(Request $request, Learner $learner): array
@@ -680,14 +716,23 @@ class AppCompatController extends Controller
         $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['string']]);
 
         $ids = $request->input('ids', []);
-        Learner::query()
-            ->whereIn('uuid', $ids)
-            ->update([
+
+        $learners = Learner::query()->whereIn('uuid', $ids)->get();
+
+        $learners->each(function (Learner $learner): void {
+            $learner->forceFill([
                 'enrollment_status' => EnrollmentStatus::Enrolled->value,
                 'approved_at' => now(),
             ]);
 
-        return ['success' => true, 'updated' => count($ids)];
+            if (! $learner->section_assignment_id) {
+                $learner->section_assignment_id = $this->assignSection($learner)?->id;
+            }
+
+            $learner->save();
+        });
+
+        return ['success' => true, 'updated' => $learners->count()];
     }
 
     public function enrolleesBulkReject(Request $request): array

@@ -28,6 +28,9 @@ class DatabaseSeeder extends Seeder
             PersonnelSeeder::class,
             AnnouncementSeeder::class,
             ReportSeeder::class,
+            SectionSeeder::class,
+            LearnerSeeder::class,
+            ClassScheduleSeeder::class,
         ]);
     }
 }
