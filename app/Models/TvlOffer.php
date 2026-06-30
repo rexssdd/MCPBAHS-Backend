@@ -15,6 +15,7 @@ class TvlOffer extends Model
         'description',
         'icon',
         'image_path',
+        'image_disk',
         'certifications',
         'display_order',
         'is_active',
@@ -22,6 +23,7 @@ class TvlOffer extends Model
 
     protected $hidden = [
         'id',
+        'image_disk',
     ];
 
     protected $appends = [
@@ -37,6 +39,11 @@ class TvlOffer extends Model
      * Public URL for the offer's image, used both on the public homepage
      * TVL section and the admin TVL offers manager. Null when no image has
      * been uploaded so the frontend can fall back to the emoji icon.
+     *
+     * Uses the disk the image was actually stored on (image_disk) rather
+     * than always assuming the currently configured default disk — older
+     * rows created before image_disk existed fall back to that default
+     * for backward compatibility.
      */
     public function getImageUrlAttribute(): ?string
     {
@@ -44,6 +51,11 @@ class TvlOffer extends Model
             return null;
         }
 
-        return Storage::disk(config('filesystems.default'))->url($this->image_path);
+        $disk = $this->image_disk ?: config('filesystems.default');
+
+        $diskInstance = Storage::disk($disk);
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $diskInstance */
+
+        return $diskInstance->url($this->image_path);
     }
 }

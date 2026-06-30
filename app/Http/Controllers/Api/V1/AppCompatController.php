@@ -17,6 +17,7 @@ use App\Models\Report;
 use App\Models\Section;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -148,8 +149,8 @@ class AppCompatController extends Controller
      */
     public function notifications(): array
     {
-        /** @var \App\Models\User $user */
-        $user  = auth()->user();
+        /** @var User $user */
+        $user  = Auth::user();
         $items = [];
 
         // ── 1. Announcements ─────────────────────────────────────────────────
@@ -270,8 +271,8 @@ class AppCompatController extends Controller
 
     public function notificationsUnreadCount(): array
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         $reportCount = Report::query()
             ->whereIn('status', [ReportStatus::Approved->value, ReportStatus::Rejected->value])
@@ -288,7 +289,7 @@ class AppCompatController extends Controller
     }
 
     /** Map a Carbon date (or null) to Today / Yesterday / Earlier. */
-    private function notifGroup($date): string
+    private function notifGroup(string|\Carbon\Carbon|null $date): string
     {
         if (! $date) return 'Earlier';
         try {
@@ -309,8 +310,8 @@ class AppCompatController extends Controller
      */
     public function markNotificationRead(string $id): \Illuminate\Http\Response
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         if ($user && str_starts_with($id, 'db-')) {
             $numericId = (int) substr($id, 3);
@@ -329,8 +330,8 @@ class AppCompatController extends Controller
      */
     public function markAllNotificationsRead(): \Illuminate\Http\Response
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         if ($user) {
             Notification::query()
@@ -348,8 +349,8 @@ class AppCompatController extends Controller
      */
     public function deleteNotification(string $id): \Illuminate\Http\Response
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         if ($user && str_starts_with($id, 'db-')) {
             $numericId = (int) substr($id, 3);
@@ -367,8 +368,8 @@ class AppCompatController extends Controller
      */
     public function clearNotifications(): \Illuminate\Http\Response
     {
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         if ($user) {
             Notification::query()->where('user_id', $user->id)->delete();

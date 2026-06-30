@@ -2,8 +2,8 @@
 
 namespace App\Actions\Reports;
 
+use App\Support\StorageUploader;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 
 class StoreReportAction
 {
@@ -12,18 +12,14 @@ class StoreReportAction
         $extension = $file->getClientOriginalExtension();
         $directory = 'reports';
 
-        // Uses the disk configured via FILESYSTEM_DISK env var.
-        // In development this is 'local'; in production on Railway
-        // it should be 's3' (or any S3-compatible driver like R2)
-        // so that files survive container restarts and redeploys.
-        $path = $file->storeAs(
-            $directory,
-            "{$uuid}.{$extension}",
-            Storage::getDefaultDriver()
-        );
+        // StorageUploader tries the configured default disk (e.g. S3 in
+        // production) and automatically falls back to the local 'public'
+        // disk if that disk isn't actually reachable (e.g. missing S3
+        // credentials), instead of letting the whole request 500.
+        $stored = StorageUploader::store($file, $directory, "{$uuid}.{$extension}");
 
         return [
-            'file_path'         => $path,
+            'file_path'         => $stored['path'],
             'original_filename' => $file->getClientOriginalName(),
             'mime_type'         => $file->getMimeType(),
             'file_size'         => $file->getSize(),
