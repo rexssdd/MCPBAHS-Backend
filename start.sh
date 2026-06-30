@@ -95,4 +95,15 @@ APP_PORT="${PORT:-80}"
 echo "[start] Binding Apache to port ${APP_PORT}..."
 sed -i "s/__PORT__/${APP_PORT}/g" /etc/apache2/ports.conf /etc/apache2/sites-available/000-default.conf
 
+# ── MPM cleanup (runtime, not just build time) ──────────────────────────────
+# Known Railway issue: php:8.x-apache images can end up with both mpm_prefork
+# and mpm_event enabled, causing "AH00534: More than one MPM loaded" at
+# startup. Disabling at build time (Dockerfile RUN a2dismod) doesn't reliably
+# stick — Railway's runtime layer can resync mods-enabled symlinks afterward.
+# Redo the cleanup here, immediately before Apache actually launches.
+a2dismod mpm_event mpm_worker >/dev/null 2>&1 || true
+rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.* 2>/dev/null || true
+a2enmod mpm_prefork >/dev/null 2>&1 || true
+apache2ctl -t
+
 exec apache2-foreground
