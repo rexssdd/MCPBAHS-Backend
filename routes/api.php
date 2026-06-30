@@ -23,6 +23,15 @@ Route::middleware('signed')->prefix('v1')->group(function () {
 
 Route::get('/school/dashboard', [AppCompatController::class, 'schoolDashboard']);
 
+// Public landing-page data — intentionally unauthenticated, and intentionally
+// narrower than their auth:sanctum counterparts (facultyIndex/announcements
+// resource route): no contact info, no draft/scheduled/internal-audience
+// announcements. See AppCompatController::facultyPublic / announcementsPublic.
+Route::prefix('v1')->controller(AppCompatController::class)->group(function () {
+    Route::get('public/faculty', 'facultyPublic');
+    Route::get('public/announcements', 'announcementsPublic');
+});
+
 Route::prefix('v1')->controller(AppCompatController::class)->group(function () {
     Route::get('health', 'health');
 
