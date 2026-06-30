@@ -34,6 +34,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // a CSRF-protected session request, causing 419 on /api/login since the
         // SPA never calls /sanctum/csrf-cookie. Removed — not needed for
         // cross-domain Bearer-token auth (Vercel frontend + Railway backend).
+
+        $middleware->alias([
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
