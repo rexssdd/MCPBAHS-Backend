@@ -34,8 +34,17 @@ class PublicController extends Controller
      */
     public function calendarEvents()
     {
+        // NOTE: whereRaw('is_published = true'), not ->where('is_published', true).
+        // Our pgsql connection runs with PDO::ATTR_EMULATE_PREPARES = true (for
+        // Supabase's Supavisor pooler), which inlines a bound PHP bool as the
+        // integer literal 1/0. Postgres has no implicit cast from integer to a
+        // native boolean column, so that raised "column is of type boolean but
+        // expression is of type integer" — a 500 here — even though the model
+        // itself never touched the (fine) PgBoolean cast, because a query
+        // builder ->where() bypasses casts entirely. Same fix already used in
+        // AppCompatController::markNotificationRead().
         $events = CalendarEvent::query()
-            ->where('is_published', true)
+            ->whereRaw('is_published = true')
             ->orderBy('event_date')
             ->get()
             ->map(fn (CalendarEvent $event) => [
@@ -77,8 +86,10 @@ class PublicController extends Controller
      */
     public function tvlOffers()
     {
+        // Same emulated-prepares boolean binding issue as calendarEvents()
+        // above — raw comparison instead of ->where('is_active', true).
         $offers = TvlOffer::query()
-            ->where('is_active', true)
+            ->whereRaw('is_active = true')
             ->orderBy('display_order')
             ->get()
             ->map(fn (TvlOffer $offer) => [
