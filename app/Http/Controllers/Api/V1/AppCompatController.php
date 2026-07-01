@@ -764,20 +764,14 @@ class AppCompatController extends Controller
 
     public function publicEnrollmentShow(string $type, string $key): array
     {
-        $learner = Learner::query()
-            ->where('lrn', $key)
-            ->orWhere('uuid', $key)
-            ->firstOrFail();
+        $learner = $this->findLearnerByKey($key)->firstOrFail();
 
         return $this->enrolleePayload($learner);
     }
 
     public function publicEnrollmentUpdate(Request $request, string $type, string $key): array
     {
-        $learner = Learner::query()
-            ->where('lrn', $key)
-            ->orWhere('uuid', $key)
-            ->firstOrFail();
+        $learner = $this->findLearnerByKey($key)->firstOrFail();
 
         $request->merge($this->publicEnrollmentData($request, $type));
         $learner->forceFill($this->learnerPayload($request, $learner))->save();
@@ -787,13 +781,36 @@ class AppCompatController extends Controller
 
     public function publicEnrollmentDestroy(string $type, string $key): \Illuminate\Http\Response
     {
-        Learner::query()
-            ->where('lrn', $key)
-            ->orWhere('uuid', $key)
-            ->firstOrFail()
-            ->delete();
+        $this->findLearnerByKey($key)->firstOrFail()->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * Look up a learner by LRN or UUID, whichever $key looks like.
+     *
+     * FIX: the "uuid" column is a native Postgres `uuid` type. Blindly doing
+     * ->where('lrn', $key)->orWhere('uuid', $key) sends $key as a bound
+     * parameter for BOTH comparisons, and when $key is an LRN (e.g. a
+     * 12-digit number) rather than a UUID, Postgres refuses to cast it to
+     * uuid and throws "invalid input syntax for type uuid" — there is no
+     * implicit or assignment cast from arbitrary text/integer to uuid. Only
+     * add the uuid comparison when $key actually matches the UUID shape.
+     */
+    private function findLearnerByKey(string $key): \Illuminate\Database\Eloquent\Builder
+    {
+        $isUuid = (bool) preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+            $key
+        );
+
+        return Learner::query()->where(function ($query) use ($key, $isUuid) {
+            $query->where('lrn', $key);
+
+            if ($isUuid) {
+                $query->orWhere('uuid', $key);
+            }
+        });
     }
 
     public function schedulesIndex(): array
