@@ -116,8 +116,11 @@ class PublicController extends Controller
      * GET /announcements route (removed in the CNS-05 fix because it
      * exposed urgency, target audience, and scheduled/unposted content
      * to anonymous visitors). This endpoint only ever returns
-     * already-posted, "all audience" announcements, and strips
-     * internal scheduling fields before sending them out.
+     * already-posted announcements created by the principal, targeted
+     * at "All" or "Students" audiences, and strips internal scheduling
+     * fields before sending them out. Teacher/staff-only announcements,
+     * drafts, and non-principal posts are intentionally excluded from
+     * the public homepage.
      */
     public function announcements(Request $request)
     {
@@ -125,8 +128,12 @@ class PublicController extends Controller
 
         $announcements = Announcement::query()
             ->where('status', AnnouncementStatus::Posted->value)
-            ->where('target_audience', TargetAudience::All->value)
+            ->whereIn('target_audience', [
+                TargetAudience::All->value,
+                TargetAudience::Students->value,
+            ])
             ->whereNotNull('posted_at')
+            ->whereHas('creator', fn ($q) => $q->role('principal'))
             ->orderByDesc('posted_at')
             ->limit($limit)
             ->get()
