@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PgBoolean;
 use App\Traits\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
@@ -32,7 +33,7 @@ class TvlOffer extends Model
 
     protected $casts = [
         'certifications' => 'array',
-        'is_active'      => 'boolean',
+        'is_active'      => PgBoolean::class,
     ];
 
     /**

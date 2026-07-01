@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PgBoolean;
 use App\Enums\Learners\EnrollmentStatus;
 use App\Enums\Learners\LearnerType;
 use App\Enums\Sex;
@@ -124,12 +125,12 @@ public $incrementing = false;
         'enrollment_status' => EnrollmentStatus::class,
         'sex' => Sex::class,
 
-        'has_lrn' => 'boolean',
-        'is_ip' => 'boolean',
-        'is_4ps' => 'boolean',
-        'is_pwd' => 'boolean',
-        'image_usage_consent' => 'boolean',
-        'data_privacy_consent' => 'boolean',
+        'has_lrn' => PgBoolean::class,
+        'is_ip' => PgBoolean::class,
+        'is_4ps' => PgBoolean::class,
+        'is_pwd' => PgBoolean::class,
+        'image_usage_consent' => PgBoolean::class,
+        'data_privacy_consent' => PgBoolean::class,
 
         'birth_date' => 'date',
         'date_transferred' => 'date',

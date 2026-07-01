@@ -23,11 +23,6 @@ class SectionResource extends JsonResource
 
             'school_year' => $this->school_year,
 
-            'capacity' => $this->capacity,
-            'students_count' => $this->studentCount(),
-            'remaining_slots' => $this->remainingSlots(),
-            'is_full' => ! $this->hasOpenSlot(),
-
             'academic_track' => $this->academic_track,
 
             'academic_strand' => $this->academic_strand,

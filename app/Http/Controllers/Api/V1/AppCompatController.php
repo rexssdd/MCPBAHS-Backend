@@ -315,10 +315,16 @@ class AppCompatController extends Controller
 
         if ($user && str_starts_with($id, 'db-')) {
             $numericId = (int) substr($id, 3);
+            // NOTE: this is a query-builder mass update, so it bypasses the
+            // model's PgBoolean cast. Use DB::raw('true') instead of a PHP
+            // bool, otherwise Laravel's binding layer sends the integer
+            // literal 1 for a native Postgres boolean column and Postgres
+            // rejects it ("column is of type boolean but expression is of
+            // type integer") under emulated prepared statements.
             Notification::query()
                 ->where('id', $numericId)
                 ->where('user_id', $user->id)
-                ->update(['is_read' => true]);
+                ->update(['is_read' => \Illuminate\Support\Facades\DB::raw('true')]);
         }
 
         return response()->noContent();
@@ -337,7 +343,7 @@ class AppCompatController extends Controller
             Notification::query()
                 ->where('user_id', $user->id)
                 ->whereRaw('is_read = false')
-                ->update(['is_read' => true]);
+                ->update(['is_read' => \Illuminate\Support\Facades\DB::raw('true')]);
         }
 
         return response()->noContent();
@@ -616,6 +622,7 @@ class AppCompatController extends Controller
             'first_name' => $request->input('firstName'),
             'last_name'  => $request->input('lastName'),
             'birth_date' => $request->input('birthDate', $request->input('dob')),
+            'lrn'        => $request->input('learnerId'),
         ]);
 
         $request->validate([
@@ -623,7 +630,8 @@ class AppCompatController extends Controller
             'last_name'  => ['required', 'string', 'max:100'],
             'birth_date' => ['nullable', 'date'],
             'sex' => ['nullable', 'string', 'in:Male,Female'],  // remove 'male','female'
-            'lrn'        => ['nullable', 'string', 'max:20'],
+            // Real DepEd LRNs are exactly 12 digits, numeric only.
+            'lrn'        => ['nullable', 'digits:12', 'unique:learners,lrn'],
         ]);
 
         $learner = Learner::create($this->learnerPayload($request));
@@ -644,6 +652,7 @@ class AppCompatController extends Controller
             'first_name' => $request->input('firstName'),
             'last_name'  => $request->input('lastName'),
             'birth_date' => $request->input('birthDate', $request->input('dob')),
+            'lrn'        => $request->input('learnerId'),
         ]);
 
         $request->validate([
@@ -651,7 +660,8 @@ class AppCompatController extends Controller
             'last_name'  => ['sometimes', 'string', 'max:100'],
             'birth_date' => ['nullable', 'date'],
             'sex'        => ['nullable', 'string', 'in:Male,Female,male,female'],
-            'lrn'        => ['nullable', 'string', 'max:20'],
+            // Real DepEd LRNs are exactly 12 digits, numeric only.
+            'lrn'        => ['nullable', 'digits:12', 'unique:learners,lrn,' . $learner->id],
         ]);
 
         $learner->forceFill($this->learnerPayload($request, $learner))->save();
@@ -666,44 +676,7 @@ class AppCompatController extends Controller
             'approved_at' => now(),
         ])->save();
 
-        $this->autoAssignSection($learner);
-
         return $this->enrolleePayload($learner->fresh());
-    }
-
-    /**
-     * Automatically place a newly-approved learner into a section that
-     * matches their grade level and school year and still has an open
-     * slot (student count < section capacity).
-     *
-     * Sections are tried in ascending order of current headcount so that
-     * enrollment fills up evenly rather than always stacking the first
-     * section found. If the learner already has a section assignment, or
-     * no section with room is available, this is a no-op.
-     */
-    private function autoAssignSection(Learner $learner): void
-    {
-        if ($learner->section_assignment_id) {
-            return; // already assigned — don't override a manual assignment
-        }
-
-        $candidates = Section::query()
-            ->where('grade_level', $learner->grade_to_enroll)
-            ->where('school_year', $learner->school_year)
-            ->withCount('learners')
-            ->get()
-            ->filter(fn (Section $section) => $section->learners_count < ($section->capacity ?? 40))
-            ->sortBy('learners_count');
-
-        $section = $candidates->first();
-
-        if (! $section) {
-            return; // no section with room — registrar/admin can assign manually
-        }
-
-        $learner->forceFill([
-            'section_assignment_id' => $section->id,
-        ])->save();
     }
 
     public function enrolleesReject(Request $request, Learner $learner): array
@@ -756,13 +729,6 @@ class AppCompatController extends Controller
                 'enrollment_status' => EnrollmentStatus::Enrolled->value,
                 'approved_at' => now(),
             ]);
-
-        // Auto-assign sections one at a time so headcounts stay accurate
-        // as each learner fills a slot.
-        Learner::query()
-            ->whereIn('uuid', $ids)
-            ->get()
-            ->each(fn (Learner $learner) => $this->autoAssignSection($learner));
 
         return ['success' => true, 'updated' => count($ids)];
     }
@@ -1447,10 +1413,6 @@ class AppCompatController extends Controller
 
     private function enrolleePayload(Learner $learner): array
     {
-        $section = $learner->relationLoaded('sectionAssignment')
-            ? $learner->sectionAssignment
-            : $learner->sectionAssignment()->first();
-
         return [
             'id'               => $learner->uuid,
             'learnerId'        => $learner->lrn ?? '',
@@ -1473,8 +1435,6 @@ class AppCompatController extends Controller
             'oldSchoolType'    => 'Public',
             'oldSchoolId'      => '',
             'status'           => $this->statusLabel($learner->enrollment_status),
-            'sectionId'        => $section?->uuid,
-            'sectionName'      => $section?->section_name,
         ];
     }
 

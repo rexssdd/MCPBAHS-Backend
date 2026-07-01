@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PgBoolean;
 use App\Traits\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,7 +27,7 @@ class CalendarEvent extends Model
 
     protected $casts = [
         'event_date'   => 'date:Y-m-d',
-        'is_published' => 'boolean',
+        'is_published' => PgBoolean::class,
     ];
 
     public function creator(): BelongsTo

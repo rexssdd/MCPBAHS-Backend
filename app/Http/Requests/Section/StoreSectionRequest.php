@@ -44,13 +44,6 @@ class StoreSectionRequest extends FormRequest
                 'max:20',
             ],
 
-            'capacity' => [
-                'nullable',
-                'integer',
-                'min:1',
-                'max:100',
-            ],
-
             'academic_track' => [
                 'nullable',
                 Rule::in(AcademicTrack::values()),

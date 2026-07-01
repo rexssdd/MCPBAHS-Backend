@@ -23,16 +23,11 @@ class Section extends Model
         'section_name',
         'grade_level',
         'school_year',
-        'capacity',
 
         'academic_track',
         'academic_strand',
 
         'adviser_id'
-    ];
-
-    protected $casts = [
-        'capacity' => 'integer',
     ];
 
     protected $hidden = [
@@ -53,26 +48,5 @@ class Section extends Model
     public function adviser(): BelongsTo
     {
         return $this->belongsTo(Personnel::class, 'adviser_id');
-    }
-
-    /**
-     * Number of currently-assigned (non-archived) learners in this section.
-     */
-    public function studentCount(): int
-    {
-        return $this->learners()->count();
-    }
-
-    /**
-     * Remaining open slots based on capacity. Never negative.
-     */
-    public function remainingSlots(): int
-    {
-        return max(0, ($this->capacity ?? 0) - $this->studentCount());
-    }
-
-    public function hasOpenSlot(): bool
-    {
-        return $this->remainingSlots() > 0;
     }
 }

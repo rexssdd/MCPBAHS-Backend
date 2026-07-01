@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PgBoolean;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -36,7 +37,7 @@ class UserPasswordOtp extends Model
 
     protected $casts = [
         'expires_at' => 'datetime',
-        'used' => 'boolean',
+        'used' => PgBoolean::class,
     ];
 
     public function user()
