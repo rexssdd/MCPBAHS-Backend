@@ -757,6 +757,28 @@ class AppCompatController extends Controller
     public function publicEnrollmentStore(Request $request, string $type): array
     {
         $request->merge($this->publicEnrollmentData($request, $type));
+
+        // FIX: this endpoint had no validation at all — a duplicate LRN (or
+        // a malformed one) went straight to Learner::create() and surfaced
+        // as a raw Postgres "duplicate key value violates unique constraint"
+        // 500 error instead of a clean, catchable validation response.
+        // Normalize camelCase (frontend) aliases into snake_case first, same
+        // pattern used by enrolleesStore/enrolleesUpdate.
+        $request->mergeIfMissing([
+            'first_name' => $request->input('firstName'),
+            'last_name'  => $request->input('lastName'),
+            'birth_date' => $request->input('birthDate', $request->input('dob')),
+        ]);
+
+        $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name'  => ['required', 'string', 'max:100'],
+            'birth_date' => ['nullable', 'date'],
+            'sex'        => ['nullable', 'string', 'in:Male,Female,male,female'],
+            // Real DepEd LRNs are exactly 12 digits, numeric only.
+            'lrn'        => ['nullable', 'digits:12', 'unique:learners,lrn'],
+        ]);
+
         $learner = Learner::create($this->learnerPayload($request));
 
         return $this->enrolleePayload($learner);
@@ -774,6 +796,21 @@ class AppCompatController extends Controller
         $learner = $this->findLearnerOrFail($key);
 
         $request->merge($this->publicEnrollmentData($request, $type));
+
+        $request->mergeIfMissing([
+            'first_name' => $request->input('firstName'),
+            'last_name'  => $request->input('lastName'),
+            'birth_date' => $request->input('birthDate', $request->input('dob')),
+        ]);
+
+        $request->validate([
+            'first_name' => ['sometimes', 'string', 'max:100'],
+            'last_name'  => ['sometimes', 'string', 'max:100'],
+            'birth_date' => ['nullable', 'date'],
+            'sex'        => ['nullable', 'string', 'in:Male,Female,male,female'],
+            'lrn'        => ['nullable', 'digits:12', 'unique:learners,lrn,' . $learner->id],
+        ]);
+
         $learner->forceFill($this->learnerPayload($request, $learner))->save();
 
         return $this->enrolleePayload($learner->fresh());
