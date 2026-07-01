@@ -666,7 +666,44 @@ class AppCompatController extends Controller
             'approved_at' => now(),
         ])->save();
 
+        $this->autoAssignSection($learner);
+
         return $this->enrolleePayload($learner->fresh());
+    }
+
+    /**
+     * Automatically place a newly-approved learner into a section that
+     * matches their grade level and school year and still has an open
+     * slot (student count < section capacity).
+     *
+     * Sections are tried in ascending order of current headcount so that
+     * enrollment fills up evenly rather than always stacking the first
+     * section found. If the learner already has a section assignment, or
+     * no section with room is available, this is a no-op.
+     */
+    private function autoAssignSection(Learner $learner): void
+    {
+        if ($learner->section_assignment_id) {
+            return; // already assigned — don't override a manual assignment
+        }
+
+        $candidates = Section::query()
+            ->where('grade_level', $learner->grade_to_enroll)
+            ->where('school_year', $learner->school_year)
+            ->withCount('learners')
+            ->get()
+            ->filter(fn (Section $section) => $section->learners_count < ($section->capacity ?? 40))
+            ->sortBy('learners_count');
+
+        $section = $candidates->first();
+
+        if (! $section) {
+            return; // no section with room — registrar/admin can assign manually
+        }
+
+        $learner->forceFill([
+            'section_assignment_id' => $section->id,
+        ])->save();
     }
 
     public function enrolleesReject(Request $request, Learner $learner): array
@@ -719,6 +756,13 @@ class AppCompatController extends Controller
                 'enrollment_status' => EnrollmentStatus::Enrolled->value,
                 'approved_at' => now(),
             ]);
+
+        // Auto-assign sections one at a time so headcounts stay accurate
+        // as each learner fills a slot.
+        Learner::query()
+            ->whereIn('uuid', $ids)
+            ->get()
+            ->each(fn (Learner $learner) => $this->autoAssignSection($learner));
 
         return ['success' => true, 'updated' => count($ids)];
     }
@@ -1403,6 +1447,10 @@ class AppCompatController extends Controller
 
     private function enrolleePayload(Learner $learner): array
     {
+        $section = $learner->relationLoaded('sectionAssignment')
+            ? $learner->sectionAssignment
+            : $learner->sectionAssignment()->first();
+
         return [
             'id'               => $learner->uuid,
             'learnerId'        => $learner->lrn ?? '',
@@ -1425,6 +1473,8 @@ class AppCompatController extends Controller
             'oldSchoolType'    => 'Public',
             'oldSchoolId'      => '',
             'status'           => $this->statusLabel($learner->enrollment_status),
+            'sectionId'        => $section?->uuid,
+            'sectionName'      => $section?->section_name,
         ];
     }
 

@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Section;
 
-use App\Enum\Sections\GradeLevel;
+use App\Enums\Sections\GradeLevel;
 use App\Enums\Sections\AcademicStrand;
 use App\Enums\Sections\AcademicTrack;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -42,6 +42,14 @@ class UpdateSectionRequest extends FormRequest
                 'sometimes',
                 'string',
                 'max:20',
+            ],
+
+            'capacity' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                'min:1',
+                'max:100',
             ],
 
             'academic_track' => [

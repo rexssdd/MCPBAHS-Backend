@@ -122,6 +122,7 @@ class SectionController extends Controller
             'section_name' => $request->input('section_name', $request->input('sectionName', $existing?->section_name ?? 'Section')),
             'grade_level' => str_contains(strtolower((string) $grade), 'grade') ? $grade : "Grade {$grade}",
             'school_year' => $request->input('school_year', $request->input('schoolYear', $existing?->school_year ?? $this->schoolYear())),
+            'capacity' => (int) $request->input('capacity', $request->input('maxStudents', $existing?->capacity ?? 40)),
             'academic_track' => $request->input('academic_track', $existing?->academic_track),
             'academic_strand' => $request->input('academic_strand', $existing?->academic_strand),
             'adviser_id' => $this->findAdviserId($request->input('adviser')) ?? $existing?->adviser_id,
