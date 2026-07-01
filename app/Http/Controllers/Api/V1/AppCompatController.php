@@ -764,14 +764,14 @@ class AppCompatController extends Controller
 
     public function publicEnrollmentShow(string $type, string $key): array
     {
-        $learner = $this->findLearnerByKey($key)->firstOrFail();
+        $learner = $this->findLearnerOrFail($key);
 
         return $this->enrolleePayload($learner);
     }
 
     public function publicEnrollmentUpdate(Request $request, string $type, string $key): array
     {
-        $learner = $this->findLearnerByKey($key)->firstOrFail();
+        $learner = $this->findLearnerOrFail($key);
 
         $request->merge($this->publicEnrollmentData($request, $type));
         $learner->forceFill($this->learnerPayload($request, $learner))->save();
@@ -781,7 +781,7 @@ class AppCompatController extends Controller
 
     public function publicEnrollmentDestroy(string $type, string $key): \Illuminate\Http\Response
     {
-        $this->findLearnerByKey($key)->firstOrFail()->delete();
+        $this->findLearnerOrFail($key)->delete();
 
         return response()->noContent();
     }
@@ -811,6 +811,25 @@ class AppCompatController extends Controller
                 $query->orWhere('uuid', $key);
             }
         });
+    }
+
+    /**
+     * Same lookup as findLearnerByKey(), but resolves the record or aborts
+     * with a clean 404.
+     *
+     * FIX: was ->firstOrFail(), which throws Laravel's default
+     * ModelNotFoundException ("No query results for model
+     * [App\Models\Learner].") — this leaks the internal model class name to
+     * API consumers and isn't a great message for the frontend to surface.
+     * Now returns a plain, consistent { "message": "..." } 404 instead.
+     */
+    private function findLearnerOrFail(string $key): Learner
+    {
+        $learner = $this->findLearnerByKey($key)->first();
+
+        abort_unless($learner, 404, 'No enrollee found for that LRN or ID.');
+
+        return $learner;
     }
 
     public function schedulesIndex(): array
