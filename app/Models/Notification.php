@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PgBoolean;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -17,7 +18,7 @@ class Notification extends Model
     ];
 
     protected $casts = [
-        'is_read' => 'boolean',
+        'is_read' => PgBoolean::class,
     ];
 
     protected $attributes = [

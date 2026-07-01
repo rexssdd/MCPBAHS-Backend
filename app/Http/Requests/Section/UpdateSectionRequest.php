@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Section;
 
-use App\Enum\Sections\GradeLevel;
+use App\Enums\Sections\GradeLevel;
 use App\Enums\Sections\AcademicStrand;
 use App\Enums\Sections\AcademicTrack;
 use Illuminate\Contracts\Validation\ValidationRule;

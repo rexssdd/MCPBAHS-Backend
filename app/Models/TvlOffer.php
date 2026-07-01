@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PgBoolean;
 use App\Traits\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
@@ -17,8 +18,6 @@ class TvlOffer extends Model
         'image_path',
         'image_disk',
         'certifications',
-        'duration',
-        'details',
         'display_order',
         'is_active',
     ];
@@ -34,8 +33,7 @@ class TvlOffer extends Model
 
     protected $casts = [
         'certifications' => 'array',
-        'details'        => 'array',
-        'is_active'      => 'boolean',
+        'is_active'      => PgBoolean::class,
     ];
 
     /**

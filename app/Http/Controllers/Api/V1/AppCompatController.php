@@ -315,10 +315,16 @@ class AppCompatController extends Controller
 
         if ($user && str_starts_with($id, 'db-')) {
             $numericId = (int) substr($id, 3);
+            // NOTE: this is a query-builder mass update, so it bypasses the
+            // model's PgBoolean cast. Use DB::raw('true') instead of a PHP
+            // bool, otherwise Laravel's binding layer sends the integer
+            // literal 1 for a native Postgres boolean column and Postgres
+            // rejects it ("column is of type boolean but expression is of
+            // type integer") under emulated prepared statements.
             Notification::query()
                 ->where('id', $numericId)
                 ->where('user_id', $user->id)
-                ->update(['is_read' => true]);
+                ->update(['is_read' => \Illuminate\Support\Facades\DB::raw('true')]);
         }
 
         return response()->noContent();
@@ -337,7 +343,7 @@ class AppCompatController extends Controller
             Notification::query()
                 ->where('user_id', $user->id)
                 ->whereRaw('is_read = false')
-                ->update(['is_read' => true]);
+                ->update(['is_read' => \Illuminate\Support\Facades\DB::raw('true')]);
         }
 
         return response()->noContent();
@@ -616,6 +622,7 @@ class AppCompatController extends Controller
             'first_name' => $request->input('firstName'),
             'last_name'  => $request->input('lastName'),
             'birth_date' => $request->input('birthDate', $request->input('dob')),
+            'lrn'        => $request->input('learnerId'),
         ]);
 
         $request->validate([
@@ -623,7 +630,8 @@ class AppCompatController extends Controller
             'last_name'  => ['required', 'string', 'max:100'],
             'birth_date' => ['nullable', 'date'],
             'sex' => ['nullable', 'string', 'in:Male,Female'],  // remove 'male','female'
-            'lrn'        => ['nullable', 'string', 'max:20'],
+            // Real DepEd LRNs are exactly 12 digits, numeric only.
+            'lrn'        => ['nullable', 'digits:12', 'unique:learners,lrn'],
         ]);
 
         $learner = Learner::create($this->learnerPayload($request));
@@ -644,6 +652,7 @@ class AppCompatController extends Controller
             'first_name' => $request->input('firstName'),
             'last_name'  => $request->input('lastName'),
             'birth_date' => $request->input('birthDate', $request->input('dob')),
+            'lrn'        => $request->input('learnerId'),
         ]);
 
         $request->validate([
@@ -651,7 +660,8 @@ class AppCompatController extends Controller
             'last_name'  => ['sometimes', 'string', 'max:100'],
             'birth_date' => ['nullable', 'date'],
             'sex'        => ['nullable', 'string', 'in:Male,Female,male,female'],
-            'lrn'        => ['nullable', 'string', 'max:20'],
+            // Real DepEd LRNs are exactly 12 digits, numeric only.
+            'lrn'        => ['nullable', 'digits:12', 'unique:learners,lrn,' . $learner->id],
         ]);
 
         $learner->forceFill($this->learnerPayload($request, $learner))->save();
@@ -747,6 +757,28 @@ class AppCompatController extends Controller
     public function publicEnrollmentStore(Request $request, string $type): array
     {
         $request->merge($this->publicEnrollmentData($request, $type));
+
+        // FIX: this endpoint had no validation at all — a duplicate LRN (or
+        // a malformed one) went straight to Learner::create() and surfaced
+        // as a raw Postgres "duplicate key value violates unique constraint"
+        // 500 error instead of a clean, catchable validation response.
+        // Normalize camelCase (frontend) aliases into snake_case first, same
+        // pattern used by enrolleesStore/enrolleesUpdate.
+        $request->mergeIfMissing([
+            'first_name' => $request->input('firstName'),
+            'last_name'  => $request->input('lastName'),
+            'birth_date' => $request->input('birthDate', $request->input('dob')),
+        ]);
+
+        $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name'  => ['required', 'string', 'max:100'],
+            'birth_date' => ['nullable', 'date'],
+            'sex'        => ['nullable', 'string', 'in:Male,Female,male,female'],
+            // Real DepEd LRNs are exactly 12 digits, numeric only.
+            'lrn'        => ['nullable', 'digits:12', 'unique:learners,lrn'],
+        ]);
+
         $learner = Learner::create($this->learnerPayload($request));
 
         return $this->enrolleePayload($learner);
@@ -754,22 +786,31 @@ class AppCompatController extends Controller
 
     public function publicEnrollmentShow(string $type, string $key): array
     {
-        $learner = Learner::query()
-            ->where('lrn', $key)
-            ->orWhere('uuid', $key)
-            ->firstOrFail();
+        $learner = $this->findLearnerOrFail($key);
 
         return $this->enrolleePayload($learner);
     }
 
     public function publicEnrollmentUpdate(Request $request, string $type, string $key): array
     {
-        $learner = Learner::query()
-            ->where('lrn', $key)
-            ->orWhere('uuid', $key)
-            ->firstOrFail();
+        $learner = $this->findLearnerOrFail($key);
 
         $request->merge($this->publicEnrollmentData($request, $type));
+
+        $request->mergeIfMissing([
+            'first_name' => $request->input('firstName'),
+            'last_name'  => $request->input('lastName'),
+            'birth_date' => $request->input('birthDate', $request->input('dob')),
+        ]);
+
+        $request->validate([
+            'first_name' => ['sometimes', 'string', 'max:100'],
+            'last_name'  => ['sometimes', 'string', 'max:100'],
+            'birth_date' => ['nullable', 'date'],
+            'sex'        => ['nullable', 'string', 'in:Male,Female,male,female'],
+            'lrn'        => ['nullable', 'digits:12', 'unique:learners,lrn,' . $learner->id],
+        ]);
+
         $learner->forceFill($this->learnerPayload($request, $learner))->save();
 
         return $this->enrolleePayload($learner->fresh());
@@ -777,13 +818,55 @@ class AppCompatController extends Controller
 
     public function publicEnrollmentDestroy(string $type, string $key): \Illuminate\Http\Response
     {
-        Learner::query()
-            ->where('lrn', $key)
-            ->orWhere('uuid', $key)
-            ->firstOrFail()
-            ->delete();
+        $this->findLearnerOrFail($key)->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * Look up a learner by LRN or UUID, whichever $key looks like.
+     *
+     * FIX: the "uuid" column is a native Postgres `uuid` type. Blindly doing
+     * ->where('lrn', $key)->orWhere('uuid', $key) sends $key as a bound
+     * parameter for BOTH comparisons, and when $key is an LRN (e.g. a
+     * 12-digit number) rather than a UUID, Postgres refuses to cast it to
+     * uuid and throws "invalid input syntax for type uuid" — there is no
+     * implicit or assignment cast from arbitrary text/integer to uuid. Only
+     * add the uuid comparison when $key actually matches the UUID shape.
+     */
+    private function findLearnerByKey(string $key): \Illuminate\Database\Eloquent\Builder
+    {
+        $isUuid = (bool) preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+            $key
+        );
+
+        return Learner::query()->where(function ($query) use ($key, $isUuid) {
+            $query->where('lrn', $key);
+
+            if ($isUuid) {
+                $query->orWhere('uuid', $key);
+            }
+        });
+    }
+
+    /**
+     * Same lookup as findLearnerByKey(), but resolves the record or aborts
+     * with a clean 404.
+     *
+     * FIX: was ->firstOrFail(), which throws Laravel's default
+     * ModelNotFoundException ("No query results for model
+     * [App\Models\Learner].") — this leaks the internal model class name to
+     * API consumers and isn't a great message for the frontend to surface.
+     * Now returns a plain, consistent { "message": "..." } 404 instead.
+     */
+    private function findLearnerOrFail(string $key): Learner
+    {
+        $learner = $this->findLearnerByKey($key)->first();
+
+        abort_unless($learner, 404, 'No enrollee found for that LRN or ID.');
+
+        return $learner;
     }
 
     public function schedulesIndex(): array

@@ -90,8 +90,6 @@ class PublicController extends Controller
                 'tag'            => 'TVL – ' . $offer->title,
                 'tesda'          => collect($offer->certifications ?? [])->first() ?? 'NC II Eligible',
                 'certifications' => $offer->certifications ?? [],
-                'duration'       => $offer->duration ?? '2 Semesters',
-                'details'        => $offer->details ?? [],
             ])
             ->values();
 

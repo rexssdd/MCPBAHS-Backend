@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PgBoolean;
 use App\Enums\Learners\EnrollmentStatus;
 use App\Enums\Learners\LearnerType;
 use App\Enums\Sex;
@@ -9,7 +10,6 @@ use App\Traits\HasPublicUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 /**
  * @property mixed $learner_type
@@ -25,11 +25,17 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
  */
 class Learner extends Model
 {
-    use HasUuids, SoftDeletes;
+    // FIX: was `use HasUuids` — Laravel's built-in trait treats the primary
+    // key column itself (getKeyName(), i.e. "id") as a UUID and assigns a
+    // generated UUID string to it on create. But this table's "id" is a
+    // normal bigint auto-increment PK (migration uses $table->id()); the
+    // UUID lives in a separate "uuid" column. That mismatch is what caused
+    // "invalid input syntax for type bigint" — a UUID string was being
+    // inserted into the bigint id column. HasPublicUuid (used by every
+    // other model in this app) is the correct trait: it only populates the
+    // separate "uuid" column and leaves "id" as a normal auto-increment PK.
+    use HasPublicUuid, SoftDeletes;
 
-protected $keyType = 'string';
-
-public $incrementing = false;
      protected $fillable = [
 
         // enrollment context
@@ -124,12 +130,12 @@ public $incrementing = false;
         'enrollment_status' => EnrollmentStatus::class,
         'sex' => Sex::class,
 
-        'has_lrn' => 'boolean',
-        'is_ip' => 'boolean',
-        'is_4ps' => 'boolean',
-        'is_pwd' => 'boolean',
-        'image_usage_consent' => 'boolean',
-        'data_privacy_consent' => 'boolean',
+        'has_lrn' => PgBoolean::class,
+        'is_ip' => PgBoolean::class,
+        'is_4ps' => PgBoolean::class,
+        'is_pwd' => PgBoolean::class,
+        'image_usage_consent' => PgBoolean::class,
+        'data_privacy_consent' => PgBoolean::class,
 
         'birth_date' => 'date',
         'date_transferred' => 'date',
