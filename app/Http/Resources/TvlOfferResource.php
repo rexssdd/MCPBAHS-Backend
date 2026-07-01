@@ -25,6 +25,8 @@ class TvlOfferResource extends JsonResource
             'icon' => $this->icon,
             'image_url' => $this->image_url,
             'certifications' => $this->certifications ?? [],
+            'duration' => $this->duration,
+            'details' => $this->details ?? [],
             'display_order' => $this->display_order,
             'is_active' => $this->is_active,
         ];
