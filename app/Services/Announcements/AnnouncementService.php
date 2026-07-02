@@ -35,16 +35,25 @@ class AnnouncementService
         return $announcement;
     }
 
-    public function update(
+public function update(
         Announcement $announcement,
         array $data
     ): Announcement {
-        return $this->updateAction->execute(
+        $announcement = $this->updateAction->execute(
             $announcement,
             $data
         );
-    }
 
+        // BUG FIX: without this, an announcement edited to publish_mode
+        // "now" was left at status "processing" forever — nothing ever
+        // ran DispatchAnnouncementAction to send it out and flip it to
+        // "posted". Mirrors the same check already done in create().
+        if (($data['publish_mode'] ?? '') === 'now') {
+            $this->dispatchAction->execute($announcement);
+        }
+
+        return $announcement;
+    }
     public function delete(Announcement $announcement): void
     {
         $announcement->delete();
