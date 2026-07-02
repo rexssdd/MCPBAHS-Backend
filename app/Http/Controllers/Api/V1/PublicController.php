@@ -42,36 +42,44 @@ class PublicController extends Controller
         // native boolean column, so that raised "column is of type boolean but
         // expression is of type integer" — a 500 here — even though the model
         // itself never touched the (fine) PgBoolean cast, because a query
-        // builder ->where() bypasses casts entirely. Same fix already used in
-        // AppCompatController::markNotificationRead().
+        // builder ->where() bypasses casts entirely.
         $events = CalendarEvent::query()
             ->whereRaw('is_published = true')
             ->orderBy('event_date')
             ->get()
             ->map(fn (CalendarEvent $event) => [
-                'id'       => $event->uuid,
-                'date'     => optional($event->event_date)->format('Y-m-d'),
-                'tag'      => ucfirst($event->category),
-                'title'    => $event->title,
-                'desc'     => $event->description,
+                'id'     => $event->uuid,
+                'date'   => optional($event->event_date)->format('Y-m-d'),
+                'tag'    => ucfirst($event->category ?? 'Event'),
+                'title'  => $event->title,
+                'desc'   => $event->description,
+                'source' => 'calendar',
             ]);
 
-        $principalAnnouncements = Announcement::query()
+        // Announcements with category = "event" are also surfaced on the
+        // public homepage Events/Activities calendar — they are authored
+        // through the Principal Announcements page and must not require
+        // separate entry in the CalendarEvent table.
+        // All other posted announcements (general/notice/holiday/exam) are
+        // shown in the Announcements section, NOT here.
+        $announcementEvents = Announcement::query()
             ->where('status', AnnouncementStatus::Posted->value)
+            ->where('category', 'event')
             ->whereNotNull('posted_at')
             ->orderByDesc('posted_at')
             ->limit(20)
             ->get()
             ->map(fn (Announcement $announcement) => [
-                'id'    => 'announcement-' . $announcement->uuid,
-                'date'  => optional($announcement->posted_at)->format('Y-m-d'),
-                'tag'   => 'Announcement',
-                'title' => $announcement->title,
-                'desc'  => $announcement->message,
+                'id'     => 'announcement-' . $announcement->uuid,
+                'date'   => optional($announcement->posted_at)->format('Y-m-d'),
+                'tag'    => 'Event',
+                'title'  => $announcement->title,
+                'desc'   => $announcement->message,
+                'source' => 'announcement',
             ]);
 
         $merged = $events
-            ->concat($principalAnnouncements)
+            ->concat($announcementEvents)
             ->filter(fn ($item) => ! empty($item['date']))
             ->sortBy('date')
             ->values();
@@ -138,11 +146,12 @@ class PublicController extends Controller
             ->limit($limit)
             ->get()
             ->map(fn (Announcement $announcement) => [
-                'id'    => $announcement->uuid,
-                'title' => $announcement->title,
-                'text'  => $announcement->message,
-                'urgency' => $announcement->urgency?->value,
-                'date'  => optional($announcement->posted_at)->format('Y-m-d'),
+                'id'       => $announcement->uuid,
+                'title'    => $announcement->title,
+                'text'     => $announcement->message,
+                'urgency'  => $announcement->urgency?->value,
+                'category' => $announcement->category?->value ?? $announcement->category,
+                'date'     => optional($announcement->posted_at)->format('Y-m-d'),
             ])
             ->values();
 
