@@ -14,13 +14,15 @@ class UpdateAnnouncementRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
+     *
+     * FIX: editing announcements is now Principal-only, matching
+     * StoreAnnouncementRequest. Admin can still view/delete via the
+     * role:admin|principal route group in routes/api.php, but cannot
+     * modify an announcement's content or publish state.
      */
     public function authorize(): bool
     {
-       return $this->user()?->hasAnyRole([
-            'admin',
-            'principal',
-        ]) ?? false;
+       return $this->user()?->hasRole('principal') ?? false;
     }
 
     /**

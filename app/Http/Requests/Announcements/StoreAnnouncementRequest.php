@@ -13,13 +13,15 @@ class StoreAnnouncementRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
+     *
+     * FIX: creating announcements is now Principal-only. Admin retains
+     * access to view/delete announcements (see routes/api.php's
+     * role:admin|principal group), but must not be able to author or edit
+     * them — that decision belongs to the Principal.
      */
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole([
-            'admin',
-            'principal',
-        ]) ?? false;
+        return $this->user()?->hasRole('principal') ?? false;
     }
     /**
      * Get the validation rules that apply to the request.
