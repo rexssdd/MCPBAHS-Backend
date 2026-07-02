@@ -58,7 +58,17 @@ class PublicController extends Controller
         $principalAnnouncements = Announcement::query()
             ->where('status', AnnouncementStatus::Posted->value)
             ->whereNotNull('posted_at')
-            ->whereHas('creator', fn ($q) => $q->role('principal'))
+            // NOTE: ->where('role', 'principal') on the creator, not Spatie's
+            // ->role('principal') scope. The Spatie scope depends on the
+            // model_has_roles pivot table being in sync with users.role —
+            // if that sync ever drifts for an account (e.g. a row inserted
+            // outside CreateUserAction, or a failed syncRoles() call), the
+            // pivot-based check silently matches nothing even though the
+            // account is unambiguously a principal by every other measure
+            // in the app. users.role is the column CreateUserAction/
+            // LoginController actually treat as the source of truth, so
+            // checking it directly here is both simpler and more reliable.
+            ->whereHas('creator', fn ($q) => $q->where('role', 'principal'))
             ->orderByDesc('posted_at')
             ->limit(20)
             ->get()
@@ -133,7 +143,9 @@ class PublicController extends Controller
                 TargetAudience::Students->value,
             ])
             ->whereNotNull('posted_at')
-            ->whereHas('creator', fn ($q) => $q->role('principal'))
+            // Direct users.role check instead of Spatie's ->role('principal')
+            // scope — see the matching note in calendarEvents() above.
+            ->whereHas('creator', fn ($q) => $q->where('role', 'principal'))
             ->orderByDesc('posted_at')
             ->limit($limit)
             ->get()
