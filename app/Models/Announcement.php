@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Announcements\AnnouncementCategory;
 use App\Enums\Announcements\AnnouncementStatus;
 use App\Enums\Announcements\AnnouncementUrgency;
 use App\Enums\Announcements\TargetAudience;
@@ -22,6 +23,7 @@ class Announcement extends Model
         'title',
         'message',
 
+        'category',
         'status',
         'urgency',
 
@@ -65,8 +67,9 @@ class Announcement extends Model
      * Attribute casting.
      */
     protected $casts = [
-        'status' => AnnouncementStatus::class,
-        'urgency' => AnnouncementUrgency::class,
+        'status'         => AnnouncementStatus::class,
+        'urgency'        => AnnouncementUrgency::class,
+        'category'       => AnnouncementCategory::class,
         'target_audience' => TargetAudience::class,
 
         /**

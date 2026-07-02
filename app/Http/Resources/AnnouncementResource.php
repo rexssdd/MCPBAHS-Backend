@@ -24,15 +24,15 @@ class AnnouncementResource extends JsonResource
         'title' => $this->title,
         'message' => $this->message,
 
-        'urgency' => $this->urgency?->value,
-        'category' => $this->category?->value,
-        'status' => $this->status?->value,
+        'urgency'  => $this->urgency instanceof \BackedEnum  ? $this->urgency->value  : $this->urgency,
+        'category' => $this->category instanceof \BackedEnum ? $this->category->value : $this->category,
+        'status'   => $this->status instanceof \BackedEnum   ? $this->status->value   : $this->status,
 
         // CNS-07 fix: field was incorrectly named 'mode_of_dissemination' and called
         // ->value on it as if it were a single enum, but the model stores a JSON
         // array cast as 'dissemination_modes'. This always returned null before.
         'dissemination_modes' => $this->dissemination_modes,
-        'target_audience' => $this->target_audience?->value,
+        'target_audience' => $this->target_audience instanceof \BackedEnum ? $this->target_audience->value : $this->target_audience,
 
 
         'scheduled_at' => $this->scheduled_at,

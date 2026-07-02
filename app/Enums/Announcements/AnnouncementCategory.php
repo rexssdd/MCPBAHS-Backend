@@ -4,6 +4,7 @@ namespace App\Enums\Announcements;
 
 enum AnnouncementCategory: string
 {
+    case General = 'general';
     case Event   = 'event';
     case Notice  = 'notice';
     case Holiday = 'holiday';
@@ -17,6 +18,7 @@ enum AnnouncementCategory: string
     public function label(): string
     {
         return match ($this) {
+            self::General => 'General',
             self::Event   => 'Event',
             self::Notice  => 'Notice',
             self::Holiday => 'Holiday',
