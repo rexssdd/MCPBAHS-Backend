@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
+
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class AnnouncementResource extends JsonResource
@@ -24,6 +25,7 @@ class AnnouncementResource extends JsonResource
         'message' => $this->message,
 
         'urgency' => $this->urgency?->value,
+        'category' => $this->category?->value,
         'status' => $this->status?->value,
 
         // CNS-07 fix: field was incorrectly named 'mode_of_dissemination' and called

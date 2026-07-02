@@ -173,6 +173,7 @@ class AppCompatController extends Controller
                         'type'        => 'announcement',
                         'title'       => $ann->title ?? mb_strimwidth($ann->message ?? 'Announcement', 0, 80, '…'),
                         'urgency'     => $ann->urgency?->value ?? $ann->urgency ?? '—',
+                        'category' => $ann->category?->value ?? 'notice',
                         'audience'    => $ann->target_audience?->value ?? $ann->target_audience ?? 'All',
                         'scheduledOn' => $dateStr?->format('m/d/y') ?? '—',
                         'updatedOn'   => $ann->updated_at?->format('m/d/y') ?? '—',

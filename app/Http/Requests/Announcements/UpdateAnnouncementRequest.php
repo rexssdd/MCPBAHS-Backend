@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Announcements;
 
 use App\Enums\Announcements\AnnouncementStatus;
+use App\Enums\Announcements\AnnouncementCategory;
 use App\Enums\Announcements\AnnouncementUrgency;
 use App\Enums\Announcements\DisseminationMode;
 use App\Enums\Announcements\TargetAudience;
@@ -55,6 +56,7 @@ class UpdateAnnouncementRequest extends FormRequest
             'message' => ['sometimes', 'string'],
 
             'urgency' => ['sometimes', Rule::in(AnnouncementUrgency::values())],
+            'category' => ['sometimes', Rule::in(AnnouncementCategory::values())],
 
             'target_audience' => ['sometimes', Rule::in(TargetAudience::values())],
 
@@ -62,7 +64,6 @@ class UpdateAnnouncementRequest extends FormRequest
             'dissemination_modes.*' => [Rule::in(DisseminationMode::values())],
 
             'scheduled_at' => ['sometimes', 'nullable', 'date'],
-
             // CNS-FE-03 fix: publish_mode was not in the allowed rules so Laravel
             // stripped it from validated() — AnnouncementService::update() never
             // received it and could never trigger DispatchAnnouncementAction.

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Announcements;
 
 use App\Enums\Announcements\AnnouncementUrgency;
+use App\Enums\Announcements\AnnouncementCategory;
 use App\Enums\Announcements\DisseminationMode;
 use App\Enums\Announcements\TargetAudience;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -38,6 +39,10 @@ class StoreAnnouncementRequest extends FormRequest
                 'required',
                 Rule::in(AnnouncementUrgency::values())
             ],
+            'category' => [
+            'required',
+            Rule::in(AnnouncementCategory::values())
+             ],
 
             'target_audience' => [
                 'required',
@@ -58,6 +63,7 @@ class StoreAnnouncementRequest extends FormRequest
                 'required',
                 Rule::in(['draft', 'now', 'schedule'])
             ],
+
 
             // CNS-06 fix: scheduled_at was unconditionally nullable, so an
             // announcement could be saved with status=scheduled but no date —
