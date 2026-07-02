@@ -27,10 +27,11 @@ class PublicController extends Controller
      *
      * Consumed by CalendarSection.jsx. Returns every published event
      * (past + future) created by admin/principal in calendar_events, plus
-     * announcements posted by the principal (folded in as read-only
-     * "Announcement" calendar entries on their posted date), so the public
-     * calendar reflects principal communications without staff having to
-     * duplicate the same date into two places.
+     * every posted announcement (folded in as read-only "Announcement"
+     * calendar entries on their posted date, regardless of which role
+     * created them), so the public calendar reflects school-wide
+     * communications without staff having to duplicate the same date
+     * into two places.
      */
     public function calendarEvents()
     {
@@ -58,17 +59,6 @@ class PublicController extends Controller
         $principalAnnouncements = Announcement::query()
             ->where('status', AnnouncementStatus::Posted->value)
             ->whereNotNull('posted_at')
-            // NOTE: ->where('role', 'principal') on the creator, not Spatie's
-            // ->role('principal') scope. The Spatie scope depends on the
-            // model_has_roles pivot table being in sync with users.role —
-            // if that sync ever drifts for an account (e.g. a row inserted
-            // outside CreateUserAction, or a failed syncRoles() call), the
-            // pivot-based check silently matches nothing even though the
-            // account is unambiguously a principal by every other measure
-            // in the app. users.role is the column CreateUserAction/
-            // LoginController actually treat as the source of truth, so
-            // checking it directly here is both simpler and more reliable.
-            ->whereHas('creator', fn ($q) => $q->where('role', 'principal'))
             ->orderByDesc('posted_at')
             ->limit(20)
             ->get()
@@ -126,11 +116,12 @@ class PublicController extends Controller
      * GET /announcements route (removed in the CNS-05 fix because it
      * exposed urgency, target audience, and scheduled/unposted content
      * to anonymous visitors). This endpoint only ever returns
-     * already-posted announcements created by the principal, targeted
-     * at "All" or "Students" audiences, and strips internal scheduling
-     * fields before sending them out. Teacher/staff-only announcements,
-     * drafts, and non-principal posts are intentionally excluded from
-     * the public homepage.
+     * already-posted announcements targeted at "All" or "Students"
+     * audiences, and strips internal scheduling fields before sending
+     * them out. Teacher/staff-only announcements and drafts are
+     * excluded; who created the announcement (admin or principal) no
+     * longer matters — any posted, appropriately-targeted announcement
+     * is public.
      */
     public function announcements(Request $request)
     {
@@ -143,9 +134,6 @@ class PublicController extends Controller
                 TargetAudience::Students->value,
             ])
             ->whereNotNull('posted_at')
-            // Direct users.role check instead of Spatie's ->role('principal')
-            // scope — see the matching note in calendarEvents() above.
-            ->whereHas('creator', fn ($q) => $q->where('role', 'principal'))
             ->orderByDesc('posted_at')
             ->limit($limit)
             ->get()
